@@ -15,6 +15,7 @@ plexCredsStatus='invalid'
 tempDir='/tmp/mb_setup/'
 plexCredsFile="${tempDir}plex_creds_check.txt"
 plexServersFile="${tempDir}plex_server_list.txt"
+numberedPlexServersFile="${tempDir}numbered_plex_server_list.txt"
 
 # Define text colors
 readonly blu='\e[34m'
@@ -118,7 +119,7 @@ check_plex_creds() {
     if [ "${plex_creds_option}" == '1' ]; then
       curl -s --location --request POST "${mbLoginURL}" \
       --header "${mbClientID}" \
-      --data "username=${plex_username}&password=${plex_password}" > "${plexCredsFile}"
+      --data "username=${plex_username}&password=${plex_password}" |jq . > "${plexCredsFile}"
       authResponse=$(grep -Po '"name":.*?[^\\]",' "${plexCredsFile}" |cut -c9- |tr -d '",')
       if [[ "${authResponse}" =~ 'BadRequest' ]]; then
         echo -e "${red}The credentials that you provided are not valid!${endColor}"
@@ -129,12 +130,13 @@ check_plex_creds() {
         read -rs plex_password
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
         sed -i "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+        plexCredsStatus='ok'
       fi
     elif [ "${plex_creds_option}" == '2' ]; then
       curl -s --location --request POST "${mbLoginURL}" \
       --header "${mbClientID}" \
       --header "Content-Type: application/x-www-form-urlencoded" \
-      --data "authToken=${plex_token}" > "${plexCredsFile}"
+      --data "authToken=${plex_token}" |jq . > "${plexCredsFile}"
       authResponse=$(grep -Po '"name":.*?[^\\]",' "${plexCredsFile}" |cut -c9- |tr -d '",')
       if [[ "${authResponse}" =~ 'BadRequest' ]]; then
         echo -e "${red}The credentials that you provided are not valid!${endColor}"
@@ -143,6 +145,7 @@ check_plex_creds() {
         read -rs plex_token
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
         sed -i "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+        plexCredsStatus='ok'
       fi
     fi
   done
@@ -152,11 +155,19 @@ check_plex_creds() {
 create_plex_servers_list() {
   grep -Po '"name":.*?[^\\]",' "${plexCredsFile}" |cut -c9- |tr -d '",' > "${plexServersFile}"
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'plexServers=($(cat "${plexServersFile}"))'
-  declare -a plexServers
   for ((i = 0; i < ${#plexServers[@]}; ++i)); do
     position=$(( $i + 1 ))
     echo "$position) ${plexServers[$i]}"
-  done
+  done > "${numberedPlexServersFile}"
+}
+
+# Function to prompt user to select Plex Server from list
+prompt_for_plex_server() {
+  numberOfOptions=$(echo "${#plexServers[@]}")
+  echo 'Please choose which Plex Server you would like to setup MediaButler for:'
+  cat "${numberedPlexServersFile}"
+  read -p "Server (1 - ${numberOfOptions}):" plexServerSelection
+  selectedPlexServerName=$(sed "${plexServerSelection}q;d" |awk '{$1=""; print $0}' |cut -c2-)
 }
 
 # Main function to run all functions
@@ -167,6 +178,7 @@ main() {
   get_plex_creds
   check_plex_creds
   create_plex_servers_list
+  prompt_for_plex_server
 }
 
 main
