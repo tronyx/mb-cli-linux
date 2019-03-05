@@ -15,6 +15,12 @@ plexCredsStatus='invalid'
 # Set initial Tautulli credentials status
 tautulliURLStatus='invalid'
 tautulliAPIKeyStatus='invalid'
+# Set initial Sonarr credentials status
+sonarrURLStatus='invalid'
+sonarrAPIKeyStatus='invalid'
+# Set initial Radarr credentials status
+radarrURLStatus='invalid'
+radarrAPIKeyStatus='invalid'
 
 # Define temp dir and files
 tempDir='/tmp/mb_setup/'
@@ -38,16 +44,6 @@ readonly org='\e[38;5;202m'
 readonly lorg='\e[38;5;130m'
 readonly mgt='\e[35m'
 readonly endColor='\e[0m'
-
-# Define usage
-#usage() {
-#    cat <<- EOF
-#
-#  Usage: $(echo -e "${lorg}./$0${endColor}")
-#
-#EOF
-#
-#}
 
 # Script Information
 get_scriptname() {
