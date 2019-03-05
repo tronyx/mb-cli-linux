@@ -75,6 +75,7 @@ package_manager() {
   osInfo[/etc/gentoo-release]=emerge
   osInfo[/etc/SuSE-release]=zypp
   osInfo[/etc/debian_version]='apt-get -y -qq'
+  osInfo[/etc/alpine-release]='apk'
   osInfo[/System/Library/CoreServices/SystemVersion.plist]='mac'
 
   for f in "${!osInfo[@]}"
@@ -85,13 +86,40 @@ package_manager() {
     done
 }
 
+# Function to check if cURL is installed and, if not, install it
+check_curl() {
+  whichCURL=$(which curl)
+  if [ -z "${whichCURL}" ]; then
+    echo -e "${red}cURL is not currently installed!${endColor}"
+    echo -e "${ylw}Doing it for you now...${endColor}"
+    if [ "${packageManager}" = 'apk' ]; then
+      apk add --no-cache curl
+    elif [ "$[packageManager]" = 'mac' ]; then
+      /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" && /usr/local/bin/brew install jq
+    else
+      "${packageManager}" install curl
+    fi
+  else
+    :
+  fi
+  whichCURL=$(which curl)
+  if [ -z "${whichCURL}" ]; then
+    echo -e "${red}We tried, and failed, to install cURL!${endColor}"
+    exit 1
+  else
+    :
+  fi
+}
+
 # Function to check if JQ is installed and, if not, install it
 check_jq() {
   whichJQ=$(which jq)
   if [ -z "${whichJQ}" ]; then
     echo -e "${red}JQ is not currently installed!${endColor}"
     echo -e "${ylw}Doing it for you now...${endColor}"
-    if [ "$[packageManager]" = 'mac' ]; then
+    if [ "${packageManager}" = 'apk' ]; then
+      apk add --no-cache jq
+    elif [ "$[packageManager]" = 'mac' ]; then
       /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" && /usr/local/bin/brew install jq
     else
       "${packageManager}" install jq
