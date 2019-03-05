@@ -297,6 +297,20 @@ prompt_for_plex_server() {
   fi
 }
 
+# Function to exit the menu
+exit_menu() {
+  echo 'This will exit the program and any unfinished config setup will be lost.'
+  echo 'Are you sure you wish to exit?'
+  read -rp "${grn}[Y]${endColor}es or ${red}[N]${endColor}o):" exitPrompt
+  if ! [[ "${exitPrompt}" =~ ^(yes|y|no|n)$ ]]; then
+    echo -e "${red}Please specify yes, y, no, or n.${endColor}"
+  elif [[ "${exitPrompt}" =~ ^(yes|y)$ ]]; then
+    exit 0
+  elif [[ "${exitPrompt}" =~ ^(no|n)$ ]]; then
+    main_menu
+  fi
+}
+
 # Function to display the main menu
 main_menu(){
   echo '*****************************************'
@@ -323,7 +337,7 @@ sonarr_menu() {
   echo ''
   echo '1) Sonarr'
   echo '2) Sonarr 4K'
-  echo '3) Exit'
+  echo '3) Back to Main Menu'
   echo ''
   read -rp sonarrMenuSelection
   if ! [[ "${sonarrMenuSelection}" =~ ^(1|2|3)$ ]]; then
@@ -332,7 +346,7 @@ sonarr_menu() {
   elif [[ "${sonarrMenuSelection}" =~ ^(1|2)$ ]]; then
     sonarr_setup
   elif [ "${sonarrMenuSelection}" = '3' ]; then
-    exit 1
+    main_menu
   fi
 }
 
@@ -347,7 +361,7 @@ radarr_menu() {
   echo '1) Radarr'
   echo '2) Radarr 4K'
   echo '3) Radarr 3D'
-  echo '4) Exit'
+  echo '4) Back to Main Menu'
   echo ''
   read -rp radarrMenuSelection
   if ! [[ "${radarrMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
@@ -356,7 +370,7 @@ radarr_menu() {
   elif [[ "${radarrMenuSelection}" =~ ^(1|2|3)$ ]]; then
     radarr_setup
   elif [ "${radarrMenuSelection}" = '4' ]; then
-    exit 1
+    main_menu
   fi
 }
 
@@ -377,9 +391,9 @@ setup_tautulli() {
   echo ''
   echo 'Checking that the provided Tautulli URL is valid...'
   if [[ "${tautulliURL: -1}" = '/' ]]; then
-    convertedTautulliURL=$(echo "${tautulliURL}" |sed 's/:/%3A/g')
+    convertedTautulliURL=$(echo "${tautulliURL}")
   elif [[ "${tautulliURL: -1}" != '/' ]]; then
-    convertedTautulliURL=$(tautulliURL+=\/; echo "${tautulliURL}" |sed 's/:/%3A/g')
+    convertedTautulliURL=$(tautulliURL+=\/; echo "${tautulliURL}")
   fi
   tautulliURLCheckResponse=$(curl -sI "${convertedTautulliURL}"auth/login |grep HTTP |awk '{print $2}')
   while [ "${tautulliURLStatus}" = 'invalid' ]; do
@@ -411,10 +425,40 @@ setup_tautulli() {
       echo ''
     fi
   done
+  echo 'Testing the full Tautulli config for MediaButler...'
+  JSONConvertedTautulliURL=$(echo "${tautulliURL}" |sed 's/:/%3A/g')
   curl -s --location --request PUT "${userMBURL}configure/tautulli?" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -H "${mbClientID}" \
-  --data "url=${convertedTautulliURL}&apikey=${tautulliAPIKey}" |jq . > "${tautulliConfigFile}"
+  -H "Authorization: Bearer ${plexServerMBToken}" \
+  --data "url=${JSONConvertedTautulliURL}&apikey=${tautulliAPIKey}" |jq . > "${tautulliConfigFile}"
+  tautulliMBConfigTestResponse=$(cat "${tautulliConfigFile}" |jq .message |tr -d '"')
+  if [ "${tautulliMBConfigTestResponse}" = 'success' ]; then
+    echo -e "${grn}Success!${endColor}"
+    echo ''
+    echo 'Saving the Tautulli config to MediaButler...'
+    curl -s --location --request POST "${userMBURL}configure/tautulli?" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}" \
+    --data "url=${JSONConvertedTautulliURL}&apikey=${tautulliAPIKey}" |jq . > "${tautulliConfigFile}"
+    tautulliMBConfigPostResponse=$(cat "${tautulliConfigFile}" |jq .message |tr -d '"')
+    if [ "${tautulliMBConfigPostResponse}" = 'success' ]; then
+      echo -e "${grn}Done! Tautulli has been successfully configured for${endColor}"
+      echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
+      sleep 3
+      echo 'Returning you to the Main Menu...'
+      main_menu
+    elif [ "${tautulliMBConfigPostResponse}" != 'success' ]; then
+      echo -e "${red}Config push failed! Please try again later.${endColor}"
+      sleep 3
+      main_menu
+    fi
+  elif [ "${tautulliMBConfigTestResponse}" != 'success' ]; then
+    echo -e "${red}Hmm, something weird happened. Please try again."
+    sleep 3
+    main_menu
+  fi
 }
 
 # Main function to run all functions
@@ -441,7 +485,7 @@ main() {
   elif [ "${mainMenuSelection}" = '3' ]; then
     setup_tautulli
   elif [ "${mainMenuSelection}" = '4' ]; then
-    exit 1
+    exit_menu
   fi
 }
 
