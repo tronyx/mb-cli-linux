@@ -376,12 +376,14 @@ radarr_menu() {
 
 # Function to process Sonarr configuration
 setup_sonarr() {
-  foo
+  curl -s -X GET 'http://192.168.1.103:9898/sonarr/api/profile' -H 'X-Api-Key: ccf949b82b0a4b6f99a0949f35e37b88' |jq .[].name
+  curl -s -X GET 'http://192.168.1.103:9898/sonarr/api/rootfolder' -H 'X-Api-Key: ccf949b82b0a4b6f99a0949f35e37b88' |jq .[].path
 }
 
 # Function to process Radarr configuration
 setup_radarr() {
-  foo
+  curl -s -X GET 'http://192.168.1.103:7878/radarr/api/profile' -H 'X-Api-Key: 15bba08182544413a4d55c5b19868d9c' |jq .[].name
+  curl -s -X GET 'http://192.168.1.103:7878/radarr/api/rootfolder' -H 'X-Api-Key: 15bba08182544413a4d55c5b19868d9c' |jq .[].path
 }
 
 # Function to process Tautulli configuration
