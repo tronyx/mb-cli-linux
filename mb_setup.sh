@@ -7,7 +7,9 @@ IFS=$'\n\t'
 
 # Define variables
 mbLoginURL='https://auth.mediabutler.io/login'
+mbDiscoverURL='https://auth.mediabutler.io/login/discover'
 mbClientID='MB-Client-Identifier: 4d656446-fbe7-4545-b754-1adfb8eb554e'
+mbClientIDShort='4d656446-fbe7-4545-b754-1adfb8eb554e'
 # Set initial Plex credentials status
 plexCredsStatus='invalid'
 
@@ -29,26 +31,26 @@ readonly mgt='\e[35m'
 readonly endColor='\e[0m'
 
 # Define usage
-usage() {
-    cat <<- EOF
-
-  Usage: $(echo -e "${lorg}./$0${endColor}")
-
-EOF
-
-}
+#usage() {
+#    cat <<- EOF
+#
+#  Usage: $(echo -e "${lorg}./$0${endColor}")
+#
+#EOF
+#
+#}
 
 # Script Information
 get_scriptname() {
-    local source
-    local dir
-    source="${BASH_SOURCE[0]}"
-    while [[ -L ${source} ]]; do
-        dir="$(cd -P "$(dirname "${source}")" > /dev/null && pwd)"
-        source="$(readlink "${source}")"
-        [[ ${source} != /* ]] && source="${dir}/${source}"
-    done
-    echo "${source}"
+  local source
+  local dir
+  source="${BASH_SOURCE[0]}"
+  while [[ -L ${source} ]]; do
+    dir="$(cd -P "$(dirname "${source}")" > /dev/null && pwd)"
+    source="$(readlink "${source}")"
+    [[ ${source} != /* ]] && source="${dir}/${source}"
+  done
+  echo "${source}"
 }
 
 readonly scriptname="$(get_scriptname)"
@@ -56,13 +58,54 @@ readonly scriptpath="$(cd -P "$(dirname "${scriptname}")" > /dev/null && pwd)"
 
 # Check whether or not user is root or used sudo
 root_check() {
-    if [[ ${EUID} -ne 0 ]]; then
-        echo -e "${red}You didn't run the script as root!${endColor}"
-        echo -e "${red}Doing it for you now...${endColor}"
-        echo ''
-        sudo bash "${scriptname:-}" "${args[@]:-}"
-        exit
+  if [[ ${EUID} -ne 0 ]]; then
+    echo -e "${red}You didn't run the script as root!${endColor}"
+    echo -e "${ylw}Doing it for you now...${endColor}"
+    echo ''
+    sudo bash "${scriptname:-}" "${args[@]:-}"
+    exit
+  fi
+}
+
+# Function to determine which Package Manager to use
+package_manager() {
+  declare -A osInfo;
+  osInfo[/etc/redhat-release]='yum -y -q'
+  osInfo[/etc/arch-release]=pacman
+  osInfo[/etc/gentoo-release]=emerge
+  osInfo[/etc/SuSE-release]=zypp
+  osInfo[/etc/debian_version]='apt-get -y -qq'
+  osInfo[/System/Library/CoreServices/SystemVersion.plist]='mac'
+
+  for f in "${!osInfo[@]}"
+    do
+      if [[ -f $f ]];then
+        packageManager=${osInfo[$f]}
+      fi
+    done
+}
+
+# Function to check if JQ is installed and, if not, install it
+check_jq() {
+  whichJQ=$(which jq)
+  if [ -z "${whichJQ}" ]; then
+    echo -e "${red}JQ is not currently installed!${endColor}"
+    echo -e "${ylw}Doing it for you now...${endColor}"
+    if [ "$[packageManager]" = 'mac' ]; then
+      /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" && /usr/local/bin/brew install jq
+    else
+      "${packageManager}" install jq
     fi
+  else
+    :
+  fi
+  whichJQ=$(which jq)
+  if [ -z "${whichJQ}" ]; then
+    echo -e "${red}We tried, and failed, to install JQ!${endColor}"
+    exit 1
+  else
+    :
+  fi
 }
 
 # Create directory to neatly store temp files
@@ -75,7 +118,7 @@ create_dir() {
 cleanup() {
     rm -rf "${tempDir}"*.txt || true
 }
-trap 'cleanup' 0 1 3 6 14 15
+#trap 'cleanup' 0 1 3 6 14 15
 
 # Exit the script if the user hits CTRL+C
 function control_c() {
@@ -97,15 +140,17 @@ get_plex_creds() {
   echo '1) Plex username & password'
   echo '2) Plex token'
   echo ''
-  read -rp 'Enter your option: ' plex_creds_option
-  if [ "${plex_creds_option}" == '1' ]; then
+  read -rp 'Enter your option: ' plexCredsOption
+  if [ "${plexCredsOption}" == '1' ]; then
     echo 'Please enter your Plex username:'
-    read -r plex_username
+    read -r plexUsername
     echo 'Please enter your Plex password:'
-    read -rs plex_password
-  elif [ "${plex_creds_option}" == '2' ]; then
+    read -rs plexPassword
+    echo ''
+  elif [ "${plexCredsOption}" == '2' ]; then
     echo 'Please enter your Plex token:'
-    read -rs plex_token
+    read -rs plexToken
+    echo ''
   else
     echo 'You provided an invalid option, please try again.'
     exit 1
@@ -116,44 +161,60 @@ get_plex_creds() {
 check_plex_creds() {
   echo "Now we're going to make sure you provided valid credentials..."
   while [ "${plexCredsStatus}" = 'invalid' ]; do
-    if [ "${plex_creds_option}" == '1' ]; then
+    if [ "${plexCredsOption}" == '1' ]; then
       curl -s --location --request POST "${mbLoginURL}" \
-      --header "${mbClientID}" \
-      --data "username=${plex_username}&password=${plex_password}" |jq . > "${plexCredsFile}"
-      authResponse=$(grep -Po '"name":.*?[^\\]",' "${plexCredsFile}" |cut -c9- |tr -d '",')
+      -H "${mbClientID}" \
+      --data "username=${plexUsername}&password=${plexPassword}" |jq . > "${plexCredsFile}"
+      authResponse=$(jq .name "${plexCredsFile}" |tr -d '"')
       if [[ "${authResponse}" =~ 'BadRequest' ]]; then
         echo -e "${red}The credentials that you provided are not valid!${endColor}"
         echo ''
         echo 'Please enter your Plex username:'
-        read -r plex_username
+        read -r plexUsername
         echo 'Please enter your Plex password:'
-        read -rs plex_password
+        read -rs plexPassword
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
-        sed -i "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+        sed -i'' "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
         plexCredsStatus='ok'
+        echo -e "${grn}Success!${endColor}"
       fi
-    elif [ "${plex_creds_option}" == '2' ]; then
+    elif [ "${plexCredsOption}" == '2' ]; then
       curl -s --location --request POST "${mbLoginURL}" \
-      --header "${mbClientID}" \
-      --header "Content-Type: application/x-www-form-urlencoded" \
-      --data "authToken=${plex_token}" |jq . > "${plexCredsFile}"
-      authResponse=$(grep -Po '"name":.*?[^\\]",' "${plexCredsFile}" |cut -c9- |tr -d '",')
+      -H "${mbClientID}" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      --data "authToken=${plexToken}" |jq . > "${plexCredsFile}"
+      authResponse=$(jq .name "${plexCredsFile}" |tr -d '"')
       if [[ "${authResponse}" =~ 'BadRequest' ]]; then
         echo -e "${red}The credentials that you provided are not valid!${endColor}"
         echo ''
         echo 'Please enter your Plex token:'
-        read -rs plex_token
+        read -rs plexToken
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
-        sed -i "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+        sed -i'' "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
         plexCredsStatus='ok'
       fi
     fi
   done
 }
 
+# Function to get user's Plex token
+get_plex_token() {
+  if [ "${plexCredsOption}" == '1' ]; then
+    plexToken=$(curl -s -X "POST" "https://plex.tv/users/sign_in.json" \
+      -H "X-Plex-Version: 1.0.0" \
+      -H "X-Plex-Product: MediaButler" \
+      -H "X-Plex-Client-Identifier: ${mbClientIDShort}" \
+      -H "Content-Type: application/x-www-form-urlencoded; charset=utf-8" \
+      --data-urlencode "user[password]=${plexPassword}" \
+      --data-urlencode "user[login]=${plexUsername}" |jq .user.authToken |tr -d '"')
+  elif [ "${plexCredsOption}" == '2' ]; then
+    :
+  fi
+}
+
 # Function to create list of Plex servers
 create_plex_servers_list() {
-  grep -Po '"name":.*?[^\\]",' "${plexCredsFile}" |cut -c9- |tr -d '",' > "${plexServersFile}"
+  jq .servers[].name "${plexCredsFile}" |tr -d '"' > "${plexServersFile}"
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'plexServers=($(cat "${plexServersFile}"))'
   for ((i = 0; i < ${#plexServers[@]}; ++i)); do
     position=$(( $i + 1 ))
@@ -161,24 +222,108 @@ create_plex_servers_list() {
   done > "${numberedPlexServersFile}"
 }
 
-# Function to prompt user to select Plex Server from list
+# Function to prompt user to select Plex Server from list and retrieve user's MediaButler URL
 prompt_for_plex_server() {
   numberOfOptions=$(echo "${#plexServers[@]}")
   echo 'Please choose which Plex Server you would like to setup MediaButler for:'
+  echo ''
   cat "${numberedPlexServersFile}"
   read -p "Server (1 - ${numberOfOptions}):" plexServerSelection
-  selectedPlexServerName=$(sed "${plexServerSelection}q;d" |awk '{$1=""; print $0}' |cut -c2-)
+  echo ''
+  echo 'Gathering required information...'
+  echo ''
+  plexServerArrayElement=$((${plexServerSelection}-1))
+  selectedPlexServerName=$(jq .servers["${plexServerArrayElement}"].name "${plexCredsFile}" |tr -d '"')
+  plexServerMachineID=$(jq .servers["${plexServerArrayElement}"].machineId "${plexCredsFile}" |tr -d '"')
+  userMBURL=$(curl -s --location --request POST "${mbDiscoverURL}" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    --data "authToken=${plexToken}&machineId=${plexServerMachineID}")
+  plexServerMBToken=$(jq .servers["${plexServerArrayElement}"].token "${plexCredsFile}" |tr -d '"')
+  echo -e "${grn}Done!${endColor}"
+  echo ''
+  echo 'Is this the correct MediaButler URL?'
+  echo -e "${ylw}${userMBURL}${endColor}"
+  echo ''
+  echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o):"
+  read -r mbURLConfirmation
+  echo ''
+  if ! [[ "${mbURLConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
+    echo -e "${red}Please specify yes, y, no, or n.${endColor}"
+  elif [[ "${mbURLConfirmation}" =~ ^(yes|y)$ ]]; then
+    :
+  elif [[ "${mbURLConfirmation}" =~ ^(no|n)$ ]]; then
+    echo 'Please enter the correct MediaButler URL:'
+    read -r userMBURL
+  fi
+}
+
+# Function to display the main menu
+main_menu(){
+  echo '*****************************************'
+  echo '*               Main Menu               *'
+  echo '*****************************************'
+  echo 'Please choose which application you would'
+  echo '   like to configure for MediaButler:    '
+  echo ''
+  echo '1) Sonarr'
+  echo '2) Radarr'
+  echo '3) Tautulli'
+  echo '4) Exit'
+  echo ''
+  read -rp mainMenuSelection
+}
+
+# Function to display the Sonarr sub-menu
+sonarr_menu() {
+  foo
+}
+
+# Function to display the Radarr sub-menu
+radarr_menu() {
+  foo
+}
+
+# Function to process Sonarr configuration
+setup_sonarr() {
+  foo
+}
+
+# Function to process Radarr configuration
+setup_radarr() {
+  foo
+}
+
+# Function to process Tautulli configuration
+setup_tautulli() {
+  foo
 }
 
 # Main function to run all functions
 main() {
   root_check
+  package_manager
+  check_jq
   create_dir
   get_line_numbers
   get_plex_creds
   check_plex_creds
+  get_plex_token
   create_plex_servers_list
   prompt_for_plex_server
+  main_menu
+  if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
+    echo -e "${red}You did not specify a valid option!${endColor}"
+    main_menu
+  elif [ "${mainMenuSelection}" = '1' ]; then
+    sonarr_menu
+  elif [ "${mainMenuSelection}" = '2' ]; then
+    radarr_menu
+  elif [ "${mainMenuSelection}" = '3' ]; then
+    setup_tautulli
+  elif [ "${mainMenuSelection}" = '4' ]; then
+    exit 1
+  fi
 }
 
 main
