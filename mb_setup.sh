@@ -12,6 +12,9 @@ mbClientID='MB-Client-Identifier: 4d656446-fbe7-4545-b754-1adfb8eb554e'
 mbClientIDShort='4d656446-fbe7-4545-b754-1adfb8eb554e'
 # Set initial Plex credentials status
 plexCredsStatus='invalid'
+# Set initial Tautulli credentials status
+tautulliURLStatus='invalid'
+tautulliAPIKeyStatus='invalid'
 
 # Define temp dir and files
 tempDir='/tmp/mb_setup/'
@@ -163,7 +166,9 @@ trap 'control_c' 2
 
 # Grab status variable line numbers
 get_line_numbers() {
-  plexCredsStatusLineNum=$(head -50 "${scriptname}" | grep -En -A1 'Set initial Plex credentials status' | tail -1 | awk -F- '{print $1}')
+  plexCredsStatusLineNum=$(head -50 "${scriptname}" |grep -En -A1 'Set initial Plex credentials status' |tail -1 | awk -F- '{print $1}')
+  tautulliURLStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Tautulli credentials status' |grep URL |awk -F- '{print $1}')
+  tautulliAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Tautulli credentials status' |grep API |awk -F- '{print $1}')
 }
 
 # Function to prompt user for Plex credentials or token
@@ -171,8 +176,8 @@ get_plex_creds() {
   echo 'Welcome to the MediaButler setup utility!'
   echo 'First thing we need are your Plex credentials so please choose from one of the following options:'
   echo ''
-  echo '1) Plex username & password'
-  echo '2) Plex token'
+  echo '1) Plex Username & Password'
+  echo '2) Plex Auth Token'
   echo ''
   read -rp 'Enter your option: ' plexCredsOption
   if [ "${plexCredsOption}" == '1' ]; then
@@ -305,7 +310,7 @@ main_menu(){
   echo '3) Tautulli'
   echo '4) Exit'
   echo ''
-  read -rp mainMenuSelection
+  read -rp 'Selection: ' mainMenuSelection
 }
 
 # Function to display the Sonarr sub-menu
@@ -367,19 +372,49 @@ setup_radarr() {
 
 # Function to process Tautulli configuration
 setup_tautulli() {
-  echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli):'
+  echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli/):'
   read -r tautulliURL
   echo ''
+  echo 'Checking that the provided Tautulli URL is valid...'
+  if [[ "${tautulliURL: -1}" = '/' ]]; then
+    convertedTautulliURL=$(echo "${tautulliURL}" |sed 's/:/%3A/g')
+  elif [[ "${tautulliURL: -1}" != '/' ]]; then
+    convertedTautulliURL=$(tautulliURL+=\/; echo "${tautulliURL}" |sed 's/:/%3A/g')
+  fi
+  tautulliURLCheckResponse=$(curl -sI "${convertedTautulliURL}"auth/login |grep HTTP |awk '{print $2}')
+  while [ "${tautulliURLStatus}" = 'invalid' ]; do
+    if [ "${tautulliURLCheckResponse}" = '200' ]; then
+      sed -i'' "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='ok'/" "${scriptname}"
+      tautulliURLStatus='ok'
+      echo -e "${grn}Success!${endColor}"
+    elif [ "${tautulliURLCheckResponse}" = '200' ]; then
+      echo -e "${red}Received something other than a 200 OK response!${endColor}"
+      echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli/):'
+      read -r tautulliURL
+      echo ''
+    fi
+  done
   echo 'Please enter your Tautulli API key:'
   read -r tautulliAPIKey
   echo ''
-  echo 'Testing that the provided Tautulli config is valid...'
-  convertedTautulliURL=$(echo ${tautulliURL} |sed 's/:/%3A/g')
-  curl --location --request PUT "${userMBURL}configure/tautulli?" \
+  echo 'Testing that the provided Tautulli API Key is valid...'
+  tautulliAPITestResponse=$(curl -s "${convertedTautulliURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
+  while [ "${tautulliAPIKeyStatus}" = 'invalid' ]; do
+    if [ "${tautulliAPITestResponse}" = 'null' ]; then
+      sed -i'' "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='ok'/" "${scriptname}"
+      tautulliAPIKeyStatus='ok'
+      echo -e "${grn}Success!${endColor}"
+    elif [ "${tautulliAPITestResponse}" = 'Invalid apikey' ]; then
+      echo -e "${red}Received something other than an OK response!${endColor}"
+      echo 'Please enter your Tautulli API Key:'
+      read -r tautulliAPIKey
+      echo ''
+    fi
+  done
+  curl -s --location --request PUT "${userMBURL}configure/tautulli?" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -H "${mbClientID}" \
   --data "url=${convertedTautulliURL}&apikey=${tautulliAPIKey}" |jq . > "${tautulliConfigFile}"
-  tautulliConfigTestResponse=$()
 }
 
 # Main function to run all functions
