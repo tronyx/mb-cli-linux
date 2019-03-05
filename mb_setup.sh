@@ -18,6 +18,12 @@ tempDir='/tmp/mb_setup/'
 plexCredsFile="${tempDir}plex_creds_check.txt"
 plexServersFile="${tempDir}plex_server_list.txt"
 numberedPlexServersFile="${tempDir}numbered_plex_server_list.txt"
+tautulliConfigFile="${tempDir}tautulli_config.txt"
+sonarrConfigFile="${tempDir}sonarr_config.txt"
+sonarr4KConfigFile="${tempDir}sonarr4k_config.txt"
+radarrConfigFile="${tempDir}radarr_config.txt"
+radarr4KConfigFile="${tempDir}radarr4k_config.txt"
+radarr3DConfigFile="${tempDir}radarr3d_config.txt"
 
 # Define text colors
 readonly blu='\e[34m'
@@ -304,12 +310,49 @@ main_menu(){
 
 # Function to display the Sonarr sub-menu
 sonarr_menu() {
-  foo
+  echo '*****************************************'
+  echo '*           Sonarr Setup Menu           *'
+  echo '*****************************************'
+  echo 'Please choose which version of Radarr you'
+  echo 'would like to configure for MediaButler: '
+  echo ''
+  echo '1) Sonarr'
+  echo '2) Sonarr 4K'
+  echo '3) Exit'
+  echo ''
+  read -rp sonarrMenuSelection
+  if ! [[ "${sonarrMenuSelection}" =~ ^(1|2|3)$ ]]; then
+    echo -e "${red}You did not specify a valid option!${endColor}"
+    sonarr_menu
+  elif [[ "${sonarrMenuSelection}" =~ ^(1|2)$ ]]; then
+    sonarr_setup
+  elif [ "${sonarrMenuSelection}" = '3' ]; then
+    exit 1
+  fi
 }
 
 # Function to display the Radarr sub-menu
 radarr_menu() {
-  foo
+  echo '*****************************************'
+  echo '*           Radarr Setup Menu           *'
+  echo '*****************************************'
+  echo 'Please choose which version of Radarr you'
+  echo 'would like to configure for MediaButler: '
+  echo ''
+  echo '1) Radarr'
+  echo '2) Radarr 4K'
+  echo '3) Radarr 3D'
+  echo '4) Exit'
+  echo ''
+  read -rp radarrMenuSelection
+  if ! [[ "${radarrMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
+    echo -e "${red}You did not specify a valid option!${endColor}"
+    radarr_menu
+  elif [[ "${radarrMenuSelection}" =~ ^(1|2|3)$ ]]; then
+    radarr_setup
+  elif [ "${radarrMenuSelection}" = '4' ]; then
+    exit 1
+  fi
 }
 
 # Function to process Sonarr configuration
@@ -324,13 +367,26 @@ setup_radarr() {
 
 # Function to process Tautulli configuration
 setup_tautulli() {
-  foo
+  echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli):'
+  read -r tautulliURL
+  echo ''
+  echo 'Please enter your Tautulli API key:'
+  read -r tautulliAPIKey
+  echo ''
+  echo 'Testing that the provided Tautulli config is valid...'
+  convertedTautulliURL=$(echo ${tautulliURL} |sed 's/:/%3A/g')
+  curl --location --request PUT "${userMBURL}configure/tautulli?" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "${mbClientID}" \
+  --data "url=${convertedTautulliURL}&apikey=${tautulliAPIKey}" |jq . > "${tautulliConfigFile}"
+  tautulliConfigTestResponse=$()
 }
 
 # Main function to run all functions
 main() {
   root_check
   package_manager
+  check_curl
   check_jq
   create_dir
   get_line_numbers
