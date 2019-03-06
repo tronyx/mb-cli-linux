@@ -34,13 +34,19 @@ radarr3dAPIKeyStatus='invalid'
 # Define temp dir and files
 tempDir='/tmp/mb_setup/'
 plexCredsFile="${tempDir}plex_creds_check.txt"
+plexTokenFile="${tempDir}plex_token.txt"
+plexServerMachineIDFile="${tempDir}plex_machineID.txt"
+userMBURLFile="${tempDir}user_mb_url.txt"
+plexServerMBTokenFile="${tempDir}plex_server_mb_token.txt"
 plexServersFile="${tempDir}plex_server_list.txt"
 numberedPlexServersFile="${tempDir}numbered_plex_server_list.txt"
 tautulliConfigFile="${tempDir}tautulli_config.txt"
-rawArrProfilesFile="${tempDir}arr_profiles.txt"
-rawArrRootDirsFile="${tempDir}arr_root_dirs.txt"
+rawArrProfilesFile="${tempDir}raw_arr_profiles.txt"
 arrProfilesFile="${tempDir}arr_profiles.txt"
+numberedArrProfilesFile="${tempDir}numbered_arr_profiles.txt"
+rawArrRootDirsFile="${tempDir}raw_arr_root_dirs.txt"
 arrRootDirsFile="${tempDir}arr_root_dirs.txt"
+numberedArrRootDirsFile="${tempDir}numbered_arr_root_dirs.txt"
 sonarrConfigFile="${tempDir}sonarr_config.txt"
 sonarr4KConfigFile="${tempDir}sonarr4k_config.txt"
 radarrConfigFile="${tempDir}radarr_config.txt"
@@ -190,6 +196,17 @@ get_line_numbers() {
   radarr3dAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Radarr 3D credentials status' |grep API |awk -F- '{print $1}')
 }
 
+# Function to reset the utility
+# This will remove all saved text files and reset the check statuses to invalid
+reset(){
+  cleanup
+  sed -i'' "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='invalid'/" "${scriptname}"
+sed -i'' "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='invalid'/" "${scriptname}"
+sed -i'' "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
+sed -i'' "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
+sed -i'' "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
+}
+
 # Function to prompt user for Plex credentials or token
 get_plex_creds() {
   echo 'Welcome to the MediaButler setup utility!'
@@ -235,6 +252,7 @@ check_plex_creds() {
         sed -i'' "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
         plexCredsStatus='ok'
         echo -e "${grn}Success!${endColor}"
+        echo ''
       fi
     elif [ "${plexCredsOption}" == '2' ]; then
       curl -s --location --request POST "${mbLoginURL}" \
@@ -268,6 +286,7 @@ get_plex_token() {
   elif [ "${plexCredsOption}" == '2' ]; then
     :
   fi
+  echo "${plexToken}" > "${plexTokenFile}"
 }
 
 # Function to create list of Plex servers
@@ -286,7 +305,8 @@ prompt_for_plex_server() {
   echo 'Please choose which Plex Server you would like to setup MediaButler for:'
   echo ''
   cat "${numberedPlexServersFile}"
-  read -p "Server (1 - ${numberOfOptions}):" plexServerSelection
+  echo ''
+  read -p "Server (1-${numberOfOptions}): " plexServerSelection
   echo ''
   echo 'Gathering required information...'
   echo ''
@@ -314,6 +334,9 @@ prompt_for_plex_server() {
     echo 'Please enter the correct MediaButler URL:'
     read -r userMBURL
   fi
+  echo "${plexServerMachineID}" > "${plexServerMachineIDFile}"
+  echo "${userMBURL}" > "${userMBURLFile}"
+  echo "${plexServerMBToken}" > "${plexServerMBTokenFile}"
 }
 
 # Function to exit the menu
@@ -332,6 +355,10 @@ exit_menu() {
 
 # Function to display the main menu
 main_menu(){
+  plexToken=$(cat "${plexTokenFile}")
+  plexServerMachineID=$(cat "${plexServerMachineIDFile}")
+  userMBURL=$(cat "${userMBURLFile}")
+  plexServerMBToken=$(cat "${plexServerMBTokenFile}")
   echo '*****************************************'
   echo '*               Main Menu               *'
   echo '*****************************************'
@@ -341,9 +368,11 @@ main_menu(){
   echo '1) Sonarr'
   echo '2) Radarr'
   echo '3) Tautulli'
-  echo '4) Exit'
+  echo '4) Reset'
+  echo '5) Exit'
   echo ''
   read -rp 'Selection: ' mainMenuSelection
+  echo ''
 }
 
 # Function to display the Sonarr sub-menu
@@ -358,12 +387,13 @@ sonarr_menu() {
   echo '2) Sonarr 4K'
   echo '3) Back to Main Menu'
   echo ''
-  read -rp sonarrMenuSelection
+  read -rp 'Selection: ' sonarrMenuSelection
+  echo ''
   if ! [[ "${sonarrMenuSelection}" =~ ^(1|2|3)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
     sonarr_menu
   elif [[ "${sonarrMenuSelection}" =~ ^(1|2)$ ]]; then
-    sonarr_setup
+    setup_sonarr
   elif [ "${sonarrMenuSelection}" = '3' ]; then
     main_menu
   fi
@@ -382,12 +412,13 @@ radarr_menu() {
   echo '3) Radarr 3D'
   echo '4) Back to Main Menu'
   echo ''
-  read -rp radarrMenuSelection
+  read -rp 'Selection: ' radarrMenuSelection
+  echo ''
   if ! [[ "${radarrMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
     radarr_menu
   elif [[ "${radarrMenuSelection}" =~ ^(1|2|3)$ ]]; then
-    radarr_setup
+    setup_radarr
   elif [ "${radarrMenuSelection}" = '4' ]; then
     main_menu
   fi
@@ -409,7 +440,8 @@ prompt_for_arr_profile() {
   echo 'Please choose which profile you would like to set as the default for MediaButler:'
   echo ''
   cat "${numberedArrProfilesFile}"
-  read -p "Profile (1 - ${numberOfOptions}):" arrProfileSelection
+  echo ''
+  read -p "Profile (1-${numberOfOptions}):" arrProfileSelection
   echo ''
   arrProfilesArrayElement=$((${arrProfileSelection}-1))
   selectedArrProfile=$(jq .["${arrProfilesArrayElement}"].name "${rawArrProfilesFile}" |tr -d '"')
@@ -417,7 +449,7 @@ prompt_for_arr_profile() {
 
 # Function to create list of Sonarr/Radarr root directories
 create_arr_root_dirs_list() {
-  jq .[].name "${rawArrRootDirsFile}" |tr -d '"' > "${arrRootDirsFile}"
+  jq .[].path "${rawArrRootDirsFile}" |tr -d '"' > "${arrRootDirsFile}"
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'arrRootDirs=($(cat "${arrRootDirsFile}"))'
   for ((i = 0; i < ${#arrRootDirs[@]}; ++i)); do
     position=$(( $i + 1 ))
@@ -431,7 +463,8 @@ prompt_for_arr_root_dir() {
   echo 'Please choose which root directory you would like to set as the default for MediaButler:'
   echo ''
   cat "${numberedArrRootDirsFile}"
-  read -p "Root Dir (1 - ${numberOfOptions}):" arrRootDirsSelection
+  echo ''
+  read -p "Root Dir (1-${numberOfOptions}):" arrRootDirsSelection
   echo ''
   arrRootDirsArrayElement=$((${arrRootDirsSelection}-1))
   selectedArrRootDirs=$(jq .["${arrRootDirsArrayElement}"].name "${rawArrRootDirsFile}" |tr -d '"')
@@ -455,6 +488,7 @@ setup_sonarr() {
         sed -i'' "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
         sonarrURLStatus='ok'
         echo -e "${grn}Success!${endColor}"
+        echo ''
       elif [ "${sonarrURLCheckResponse}" = '200' ]; then
         echo -e "${red}Received something other than a 200 OK response!${endColor}"
         echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
@@ -466,23 +500,24 @@ setup_sonarr() {
     read -r sonarrAPIKey
     echo ''
     echo 'Testing that the provided Sonarr API Key is valid...'
+    echo ''
     sonarrAPITestResponse=$(curl -s -X GET "${convertedSonarrURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
     while [ "${sonarrAPIKeyStatus}" = 'invalid' ]; do
-      if [ "${sonarrAPITestResponse}" = 'null' ]; then
-        sed -i'' "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
-        sonarrAPIKeyStatus='ok'
-        echo -e "${grn}Success!${endColor}"
-      elif [ "${sonarrAPITestResponse}" = 'Unauthorized' ]; then
+      if [ "${sonarrAPITestResponse}" = 'Unauthorized' ]; then
         echo -e "${red}Received something other than an OK response!${endColor}"
         echo 'Please enter your Sonarr API Key:'
         read -r sonarrAPIKey
         echo ''
+      elif [ "${sonarrAPITestResponse}" != 'Unauthorized' ]; then
+        sed -i'' "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
+        sonarrAPIKeyStatus='ok'
+        echo -e "${grn}Success!${endColor}"
       fi
     done
-    curl -s -X GET "${convertedSonarrURL}api/profile" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[].name |tr -d '"' > "${rawArrProfilesFile}"
+    curl -s -X GET "${convertedSonarrURL}api/profile" -H "X-Api-Key: ${sonarrAPIKey}" |jq . > "${rawArrProfilesFile}"
     create_arr_profiles_list
     prompt_for_arr_profile
-    curl -s -X GET "${convertedSonarrURL}api/rootfolder" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[].path |tr -d '"' > "${rawArrRootDirsFile}"
+    curl -s -X GET "${convertedSonarrURL}api/rootfolder" -H "X-Api-Key: ${sonarrAPIKey}" |jq . > "${rawArrRootDirsFile}"
     create_arr_root_dirs_list
     prompt_for_arr_root_dir
     echo 'Testing the full Sonarr config for MediaButler...'
@@ -491,8 +526,7 @@ setup_sonarr() {
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
-    --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${arrProfileSelection}&defaultRoot=${arrRootDirsSelection}" |jq . \
-    > "${sonarrConfigFile}"
+    --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${arrProfileSelection}&defaultRoot=${arrRootDirsSelection}" |jq . > "${sonarrConfigFile}"
     sonarrMBConfigTestResponse=$(cat "${sonarrConfigFile}" |jq .message |tr -d '"')
     if [ "${sonarrMBConfigTestResponse}" = 'success' ]; then
       echo -e "${grn}Success!${endColor}"
@@ -502,23 +536,25 @@ setup_sonarr() {
       -H "Content-Type: application/x-www-form-urlencoded" \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
-      --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${arrProfileSelection}&defaultRoot=${arrRootDirsSelection}" |jq . \
-      > "${sonarrConfigFile}"
+      --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${arrProfileSelection}&defaultRoot=${arrRootDirsSelection}" |jq . > "${sonarrConfigFile}"
       sonarrMBConfigPostResponse=$(cat "${sonarrConfigFile}" |jq .message |tr -d '"')
       if [ "${sonarrMBConfigPostResponse}" = 'success' ]; then
         echo -e "${grn}Done! Sonarr has been successfully configured for${endColor}"
         echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
         sleep 3
         echo 'Returning you to the Main Menu...'
+        clear
         main_menu
       elif [ "${sonarrMBConfigPostResponse}" != 'success' ]; then
         echo -e "${red}Config push failed! Please try again later.${endColor}"
         sleep 3
+        clear
         main_menu
       fi
     elif [ "${sonarrMBConfigTestResponse}" != 'success' ]; then
-      echo -e "${red}Hmm, something weird happened. Please try again."
+      echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
       sleep 3
+      clear
       main_menu
     fi
   elif [ "${sonarrMenuSelection}" = '2' ]; then
@@ -554,6 +590,7 @@ setup_tautulli() {
       sed -i'' "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='ok'/" "${scriptname}"
       tautulliURLStatus='ok'
       echo -e "${grn}Success!${endColor}"
+      echo ''
     elif [ "${tautulliURLCheckResponse}" = '200' ]; then
       echo -e "${red}Received something other than a 200 OK response!${endColor}"
       echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli/):'
@@ -565,12 +602,14 @@ setup_tautulli() {
   read -r tautulliAPIKey
   echo ''
   echo 'Testing that the provided Tautulli API Key is valid...'
+  echo ''
   tautulliAPITestResponse=$(curl -s "${convertedTautulliURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
   while [ "${tautulliAPIKeyStatus}" = 'invalid' ]; do
     if [ "${tautulliAPITestResponse}" = 'null' ]; then
       sed -i'' "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='ok'/" "${scriptname}"
       tautulliAPIKeyStatus='ok'
       echo -e "${grn}Success!${endColor}"
+      echo ''
     elif [ "${tautulliAPITestResponse}" = 'Invalid apikey' ]; then
       echo -e "${red}Received something other than an OK response!${endColor}"
       echo 'Please enter your Tautulli API Key:'
@@ -601,15 +640,18 @@ setup_tautulli() {
       echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
       sleep 3
       echo 'Returning you to the Main Menu...'
+      clear
       main_menu
     elif [ "${tautulliMBConfigPostResponse}" != 'success' ]; then
       echo -e "${red}Config push failed! Please try again later.${endColor}"
       sleep 3
+      clear
       main_menu
     fi
   elif [ "${tautulliMBConfigTestResponse}" != 'success' ]; then
-    echo -e "${red}Hmm, something weird happened. Please try again."
+    echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
     sleep 3
+    clear
     main_menu
   fi
 }
@@ -622,13 +664,25 @@ main() {
   check_jq
   create_dir
   get_line_numbers
-  get_plex_creds
-  check_plex_creds
-  get_plex_token
-  create_plex_servers_list
-  prompt_for_plex_server
+  if [[ -e "${plexCredsFile}" ]]; then
+    sed -i'' "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+  elif [[ ! -f "${plexCredsFile}" ]]; then
+    get_plex_creds
+    check_plex_creds
+  fi
+  if [[ -e "${plexTokenFile}" ]]; then
+    :
+  elif [[ ! -f "${plexTokenFile}" ]]; then
+    get_plex_token
+  fi
+  if [[ -e "${plexServersFile}" ]]; then
+    :
+  elif [[ ! -f "${plexServersFile}" ]]; then
+    create_plex_servers_list
+    prompt_for_plex_server
+  fi
   main_menu
-  if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
+  if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
     main_menu
   elif [ "${mainMenuSelection}" = '1' ]; then
@@ -638,6 +692,8 @@ main() {
   elif [ "${mainMenuSelection}" = '3' ]; then
     setup_tautulli
   elif [ "${mainMenuSelection}" = '4' ]; then
+    reset
+  elif [ "${mainMenuSelection}" = '5' ]; then
     exit_menu
   fi
 }
