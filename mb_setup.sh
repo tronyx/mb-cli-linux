@@ -199,12 +199,25 @@ get_line_numbers() {
 # Function to reset the utility
 # This will remove all saved text files and reset the check statuses to invalid
 reset(){
-  cleanup
-  sed -i'' "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='invalid'/" "${scriptname}"
-sed -i'' "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='invalid'/" "${scriptname}"
-sed -i'' "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
-sed -i'' "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
-sed -i'' "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
+  echo -e "${red}**WARNING!!!** This will reset ALL setup progress!${endColor}"
+  echo -e "${ylw}Do you wish to continue?${endColor}"
+  echo ''
+  echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o):"
+  read -r resetConfirmation
+  echo ''
+  if ! [[ "${resetConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
+    echo -e "${red}Please specify yes, y, no, or n.${endColor}"
+  elif [[ "${resetConfirmation}" =~ ^(yes|y)$ ]]; then
+    cleanup
+    sed -i'' "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='invalid'/" "${scriptname}"
+    sed -i'' "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='invalid'/" "${scriptname}"
+    sed -i'' "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
+    sed -i'' "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
+    sed -i'' "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
+    main_menu
+  elif [[ "${resetConfirmation}" =~ ^(no|n)$ ]]; then
+    main_menu
+  fi
 }
 
 # Function to prompt user for Plex credentials or token
@@ -216,9 +229,11 @@ get_plex_creds() {
   echo '2) Plex Auth Token'
   echo ''
   read -rp 'Enter your option: ' plexCredsOption
+  echo ''
   if [ "${plexCredsOption}" == '1' ]; then
     echo 'Please enter your Plex username:'
     read -r plexUsername
+    echo ''
     echo 'Please enter your Plex password:'
     read -rs plexPassword
     echo ''
@@ -309,7 +324,6 @@ prompt_for_plex_server() {
   read -p "Server (1-${numberOfOptions}): " plexServerSelection
   echo ''
   echo 'Gathering required information...'
-  echo ''
   plexServerArrayElement=$((${plexServerSelection}-1))
   selectedPlexServerName=$(jq .servers["${plexServerArrayElement}"].name "${plexCredsFile}" |tr -d '"')
   plexServerMachineID=$(jq .servers["${plexServerArrayElement}"].machineId "${plexCredsFile}" |tr -d '"')
@@ -343,7 +357,8 @@ prompt_for_plex_server() {
 exit_menu() {
   echo 'This will exit the program and any unfinished config setup will be lost.'
   echo 'Are you sure you wish to exit?'
-  read -rp "${grn}[Y]${endColor}es or ${red}[N]${endColor}o):" exitPrompt
+  echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o):"
+  read -r exitPrompt
   if ! [[ "${exitPrompt}" =~ ^(yes|y|no|n)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
   elif [[ "${exitPrompt}" =~ ^(yes|y)$ ]]; then
@@ -441,9 +456,9 @@ prompt_for_arr_profile() {
   echo ''
   cat "${numberedArrProfilesFile}"
   echo ''
-  read -p "Profile (1-${numberOfOptions}):" arrProfileSelection
+  read -p "Profile (1-${numberOfOptions}):" arrProfilesSelection
   echo ''
-  arrProfilesArrayElement=$((${arrProfileSelection}-1))
+  arrProfilesArrayElement=$((${arrProfilesSelection}-1))
   selectedArrProfile=$(jq .["${arrProfilesArrayElement}"].name "${rawArrProfilesFile}" |tr -d '"')
 }
 
@@ -467,7 +482,7 @@ prompt_for_arr_root_dir() {
   read -p "Root Dir (1-${numberOfOptions}):" arrRootDirsSelection
   echo ''
   arrRootDirsArrayElement=$((${arrRootDirsSelection}-1))
-  selectedArrRootDirs=$(jq .["${arrRootDirsArrayElement}"].name "${rawArrRootDirsFile}" |tr -d '"')
+  selectedArrRootDir=$(jq .["${arrRootDirsArrayElement}"].path "${rawArrRootDirsFile}" |tr -d '"')
 }
 
 # Function to process Sonarr configuration
@@ -526,7 +541,7 @@ setup_sonarr() {
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
-    --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${arrProfileSelection}&defaultRoot=${arrRootDirsSelection}" |jq . > "${sonarrConfigFile}"
+    --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${sonarrConfigFile}"
     sonarrMBConfigTestResponse=$(cat "${sonarrConfigFile}" |jq .message |tr -d '"')
     if [ "${sonarrMBConfigTestResponse}" = 'success' ]; then
       echo -e "${grn}Success!${endColor}"
@@ -536,25 +551,22 @@ setup_sonarr() {
       -H "Content-Type: application/x-www-form-urlencoded" \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
-      --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${arrProfileSelection}&defaultRoot=${arrRootDirsSelection}" |jq . > "${sonarrConfigFile}"
+      --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${sonarrConfigFile}"
       sonarrMBConfigPostResponse=$(cat "${sonarrConfigFile}" |jq .message |tr -d '"')
       if [ "${sonarrMBConfigPostResponse}" = 'success' ]; then
         echo -e "${grn}Done! Sonarr has been successfully configured for${endColor}"
         echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
         sleep 3
         echo 'Returning you to the Main Menu...'
-        clear
         main_menu
       elif [ "${sonarrMBConfigPostResponse}" != 'success' ]; then
         echo -e "${red}Config push failed! Please try again later.${endColor}"
         sleep 3
-        clear
         main_menu
       fi
     elif [ "${sonarrMBConfigTestResponse}" != 'success' ]; then
       echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
       sleep 3
-      clear
       main_menu
     fi
   elif [ "${sonarrMenuSelection}" = '2' ]; then
@@ -640,18 +652,15 @@ setup_tautulli() {
       echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
       sleep 3
       echo 'Returning you to the Main Menu...'
-      clear
       main_menu
     elif [ "${tautulliMBConfigPostResponse}" != 'success' ]; then
       echo -e "${red}Config push failed! Please try again later.${endColor}"
       sleep 3
-      clear
       main_menu
     fi
   elif [ "${tautulliMBConfigTestResponse}" != 'success' ]; then
     echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
     sleep 3
-    clear
     main_menu
   fi
 }
