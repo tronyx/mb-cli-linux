@@ -18,9 +18,18 @@ tautulliAPIKeyStatus='invalid'
 # Set initial Sonarr credentials status
 sonarrURLStatus='invalid'
 sonarrAPIKeyStatus='invalid'
+# Set initial Sonarr 4K credentials status
+sonarr4kURLStatus='invalid'
+sonarr4kAPIKeyStatus='invalid'
 # Set initial Radarr credentials status
 radarrURLStatus='invalid'
 radarrAPIKeyStatus='invalid'
+# Set initial Radarr 4K credentials status
+radarr4kURLStatus='invalid'
+radarr4kAPIKeyStatus='invalid'
+# Set initial Radarr 3D credentials status
+radarr3dURLStatus='invalid'
+radarr3dAPIKeyStatus='invalid'
 
 # Define temp dir and files
 tempDir='/tmp/mb_setup/'
@@ -28,6 +37,10 @@ plexCredsFile="${tempDir}plex_creds_check.txt"
 plexServersFile="${tempDir}plex_server_list.txt"
 numberedPlexServersFile="${tempDir}numbered_plex_server_list.txt"
 tautulliConfigFile="${tempDir}tautulli_config.txt"
+rawArrProfilesFile="${tempDir}arr_profiles.txt"
+rawArrRootDirsFile="${tempDir}arr_root_dirs.txt"
+arrProfilesFile="${tempDir}arr_profiles.txt"
+arrRootDirsFile="${tempDir}arr_root_dirs.txt"
 sonarrConfigFile="${tempDir}sonarr_config.txt"
 sonarr4KConfigFile="${tempDir}sonarr4k_config.txt"
 radarrConfigFile="${tempDir}radarr_config.txt"
@@ -165,6 +178,16 @@ get_line_numbers() {
   plexCredsStatusLineNum=$(head -50 "${scriptname}" |grep -En -A1 'Set initial Plex credentials status' |tail -1 | awk -F- '{print $1}')
   tautulliURLStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Tautulli credentials status' |grep URL |awk -F- '{print $1}')
   tautulliAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Tautulli credentials status' |grep API |awk -F- '{print $1}')
+  sonarrURLStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Sonarr credentials status' |grep URL |awk -F- '{print $1}')
+  sonarrAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Sonarr credentials status' |grep API |awk -F- '{print $1}')
+  sonarr4kURLStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Sonarr 4K credentials status' |grep URL |awk -F- '{print $1}')
+  sonarr4kAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Sonarr 4K credentials status' |grep API |awk -F- '{print $1}')
+  radarrURLStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Radarr credentials status' |grep URL |awk -F- '{print $1}')
+  radarrAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Radarr credentials status' |grep API |awk -F- '{print $1}')
+  radarr4kURLStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Radarr 4K credentials status' |grep URL |awk -F- '{print $1}')
+  radarr4kAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Radarr 4K credentials status' |grep API |awk -F- '{print $1}')
+  radarr3dURLStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Radarr 3D credentials status' |grep URL |awk -F- '{print $1}')
+  radarr3dAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Radarr 3D credentials status' |grep API |awk -F- '{print $1}')
 }
 
 # Function to prompt user for Plex credentials or token
@@ -370,16 +393,148 @@ radarr_menu() {
   fi
 }
 
+# Function to create list of Sonarr/Radarr profiles
+create_arr_profiles_list() {
+  jq .[].name "${rawArrProfilesFile}" |tr -d '"' > "${arrProfilesFile}"
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'arrProfiles=($(cat "${arrProfilesFile}"))'
+  for ((i = 0; i < ${#arrProfiles[@]}; ++i)); do
+    position=$(( $i + 1 ))
+    echo "$position) ${arrProfiles[$i]}"
+  done > "${numberedArrProfilesFile}"
+}
+
+# Function to prompt user for default Arr profile
+prompt_for_arr_profile() {
+  numberOfOptions=$(echo "${#arrProfiles[@]}")
+  echo 'Please choose which profile you would like to set as the default for MediaButler:'
+  echo ''
+  cat "${numberedArrProfilesFile}"
+  read -p "Profile (1 - ${numberOfOptions}):" arrProfileSelection
+  echo ''
+  arrProfilesArrayElement=$((${arrProfileSelection}-1))
+  selectedArrProfile=$(jq .["${arrProfilesArrayElement}"].name "${rawArrProfilesFile}" |tr -d '"')
+}
+
+# Function to create list of Sonarr/Radarr root directories
+create_arr_root_dirs_list() {
+  jq .[].name "${rawArrRootDirsFile}" |tr -d '"' > "${arrRootDirsFile}"
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'arrRootDirs=($(cat "${arrRootDirsFile}"))'
+  for ((i = 0; i < ${#arrRootDirs[@]}; ++i)); do
+    position=$(( $i + 1 ))
+    echo "$position) ${arrRootDirs[$i]}"
+  done > "${numberedArrRootDirsFile}"
+}
+
+# Function to prompt user for default Arr root directory
+prompt_for_arr_root_dir() {
+  numberOfOptions=$(echo "${#arrRootDirs[@]}")
+  echo 'Please choose which root directory you would like to set as the default for MediaButler:'
+  echo ''
+  cat "${numberedArrRootDirsFile}"
+  read -p "Root Dir (1 - ${numberOfOptions}):" arrRootDirsSelection
+  echo ''
+  arrRootDirsArrayElement=$((${arrRootDirsSelection}-1))
+  selectedArrRootDirs=$(jq .["${arrRootDirsArrayElement}"].name "${rawArrRootDirsFile}" |tr -d '"')
+}
+
 # Function to process Sonarr configuration
 setup_sonarr() {
-  curl -s -X GET 'http://192.168.1.103:9898/sonarr/api/profile' -H 'X-Api-Key: rthwrthrtwhwrthrwth' |jq .[].name
-  curl -s -X GET 'http://192.168.1.103:9898/sonarr/api/rootfolder' -H 'X-Api-Key: wrthrwthrwthrwthrwth' |jq .[].path
+  if [ "${sonarrMenuSelection}" = '1' ]; then
+    echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
+    read -r sonarrURL
+    echo ''
+    echo 'Checking that the provided Sonarr URL is valid...'
+    if [[ "${sonarrURL: -1}" = '/' ]]; then
+      convertedSonarrURL=$(echo "${sonarrURL}")
+    elif [[ "${sonarrURL: -1}" != '/' ]]; then
+      convertedSonarrURL=$(sonarrURL+=\/; echo "${sonarrURL}")
+    fi
+    sonarrURLCheckResponse=$(curl -sI "${convertedSonarrURL}" |grep -vi mono |grep HTTP |awk '{print $2}')
+    while [ "${sonarrURLStatus}" = 'invalid' ]; do
+      if [ "${sonarrURLCheckResponse}" = '200' ]; then
+        sed -i'' "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
+        sonarrURLStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+      elif [ "${sonarrURLCheckResponse}" = '200' ]; then
+        echo -e "${red}Received something other than a 200 OK response!${endColor}"
+        echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
+        read -r sonarrURL
+        echo ''
+      fi
+    done
+    echo 'Please enter your Sonarr API key:'
+    read -r sonarrAPIKey
+    echo ''
+    echo 'Testing that the provided Sonarr API Key is valid...'
+    sonarrAPITestResponse=$(curl -s -X GET "${convertedSonarrURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
+    while [ "${sonarrAPIKeyStatus}" = 'invalid' ]; do
+      if [ "${sonarrAPITestResponse}" = 'null' ]; then
+        sed -i'' "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
+        sonarrAPIKeyStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+      elif [ "${sonarrAPITestResponse}" = 'Unauthorized' ]; then
+        echo -e "${red}Received something other than an OK response!${endColor}"
+        echo 'Please enter your Sonarr API Key:'
+        read -r sonarrAPIKey
+        echo ''
+      fi
+    done
+    curl -s -X GET "${convertedSonarrURL}api/profile" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[].name |tr -d '"' > "${rawArrProfilesFile}"
+    create_arr_profiles_list
+    prompt_for_arr_profile
+    curl -s -X GET "${convertedSonarrURL}api/rootfolder" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[].path |tr -d '"' > "${rawArrRootDirsFile}"
+    create_arr_root_dirs_list
+    prompt_for_arr_root_dir
+    echo 'Testing the full Sonarr config for MediaButler...'
+    JSONConvertedSonarrURL=$(echo "${sonarrURL}" |sed 's/:/%3A/g')
+    curl -s --location --request PUT "${userMBURL}configure/sonarr?" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}" \
+    --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${arrProfileSelection}&defaultRoot=${arrRootDirsSelection}" |jq . \
+    > "${sonarrConfigFile}"
+    sonarrMBConfigTestResponse=$(cat "${sonarrConfigFile}" |jq .message |tr -d '"')
+    if [ "${sonarrMBConfigTestResponse}" = 'success' ]; then
+      echo -e "${grn}Success!${endColor}"
+      echo ''
+      echo 'Saving the Sonarr config to MediaButler...'
+      curl -s --location --request POST "${userMBURL}configure/sonarr?" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" \
+      --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${arrProfileSelection}&defaultRoot=${arrRootDirsSelection}" |jq . \
+      > "${sonarrConfigFile}"
+      sonarrMBConfigPostResponse=$(cat "${sonarrConfigFile}" |jq .message |tr -d '"')
+      if [ "${sonarrMBConfigPostResponse}" = 'success' ]; then
+        echo -e "${grn}Done! Sonarr has been successfully configured for${endColor}"
+        echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
+        sleep 3
+        echo 'Returning you to the Main Menu...'
+        main_menu
+      elif [ "${sonarrMBConfigPostResponse}" != 'success' ]; then
+        echo -e "${red}Config push failed! Please try again later.${endColor}"
+        sleep 3
+        main_menu
+      fi
+    elif [ "${sonarrMBConfigTestResponse}" != 'success' ]; then
+      echo -e "${red}Hmm, something weird happened. Please try again."
+      sleep 3
+      main_menu
+    fi
+  elif [ "${sonarrMenuSelection}" = '2' ]; then
+    foo
+  fi
 }
 
 # Function to process Radarr configuration
 setup_radarr() {
-  curl -s -X GET 'http://192.168.1.103:7878/radarr/api/profile' -H 'X-Api-Key: wsrthwrsthwrsthwrsthrwsth' |jq .[].name
-  curl -s -X GET 'http://192.168.1.103:7878/radarr/api/rootfolder' -H 'X-Api-Key: wsrthrwsthrthrwsthrtws' |jq .[].path
+  if [ "${radarrMenuSelection}" = '1' ]; then
+    foo
+  elif [ "${radarrMenuSelection}" = '2' ]; then
+    foo
+  elif [ "${radarrMenuSelection}" = '3' ]; then
+    foo
+  fi
 }
 
 # Function to process Tautulli configuration
