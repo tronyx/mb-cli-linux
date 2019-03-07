@@ -48,10 +48,10 @@ rawArrRootDirsFile="${tempDir}raw_arr_root_dirs.txt"
 arrRootDirsFile="${tempDir}arr_root_dirs.txt"
 numberedArrRootDirsFile="${tempDir}numbered_arr_root_dirs.txt"
 sonarrConfigFile="${tempDir}sonarr_config.txt"
-sonarr4KConfigFile="${tempDir}sonarr4k_config.txt"
+sonarr4kConfigFile="${tempDir}sonarr4k_config.txt"
 radarrConfigFile="${tempDir}radarr_config.txt"
-radarr4KConfigFile="${tempDir}radarr4k_config.txt"
-radarr3DConfigFile="${tempDir}radarr3d_config.txt"
+radarr4kConfigFile="${tempDir}radarr4k_config.txt"
+radarr3dConfigFile="${tempDir}radarr3d_config.txt"
 
 # Define text colors
 readonly blu='\e[34m'
@@ -248,11 +248,11 @@ reset(){
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
   elif [[ "${resetConfirmation}" =~ ^(yes|y)$ ]]; then
     cleanup
-    sed -i"" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='invalid'/" "${scriptname}"
-    sed -i"" "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='invalid'/" "${scriptname}"
-    sed -i"" "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
-    sed -i"" "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
-    sed -i"" "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
+    sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='invalid'/" "${scriptname}"
+    sed -i.bak "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='invalid'/" "${scriptname}"
+    sed -i.bak "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
+    sed -i.bak "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
+    sed -i.bak "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
     main_menu
   elif [[ "${resetConfirmation}" =~ ^(no|n)$ ]]; then
     main_menu
@@ -313,7 +313,7 @@ check_plex_creds() {
         echo 'Please enter your Plex password:'
         read -rs plexPassword
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
-        sed -i"" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+        sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
         plexCredsStatus='ok'
         echo -e "${grn}Success!${endColor}"
         echo ''
@@ -330,7 +330,7 @@ check_plex_creds() {
         echo 'Please enter your Plex token:'
         read -rs plexToken
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
-        sed -i"" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+        sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
         plexCredsStatus='ok'
       fi
     fi
@@ -567,7 +567,7 @@ setup_sonarr() {
     set -e
     while [ "${sonarrURLStatus}" = 'invalid' ]; do
       if [ "${sonarrURLCheckResponse}" = '200' ]; then
-        sed -i"" "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
+        sed -i.bak "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
         sonarrURLStatus='ok'
         echo -e "${grn}Success!${endColor}"
         echo ''
@@ -597,7 +597,7 @@ setup_sonarr() {
         echo ''
         sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
       elif [ "${sonarrAPITestResponse}" != 'Unauthorized' ]; then
-        sed -i"" "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
+        sed -i.bak "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
         sonarrAPIKeyStatus='ok'
         echo -e "${grn}Success!${endColor}"
       fi
@@ -643,18 +643,354 @@ setup_sonarr() {
       main_menu
     fi
   elif [ "${sonarrMenuSelection}" = '2' ]; then
-    foo
+    echo 'Please enter your Sonarr 4K URL (IE: http://127.0.0.1:8989/sonarr/):'
+    read -r providedURL
+    echo ''
+    echo 'Checking that the provided Sonarr 4K URL is valid...'
+    convert_url
+    set +e
+    sonarr4kURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    set -e
+    while [ "${sonarr4kURLStatus}" = 'invalid' ]; do
+      if [ "${sonarr4kURLCheckResponse}" = '200' ]; then
+        sed -i.bak "${sonarr4kURLStatusLineNum} s/sonarr4kURLStatus='[^']*'/sonarr4kURLStatus='ok'/" "${scriptname}"
+        sonarr4kURLStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+        echo ''
+      elif [ "${sonarr4kURLCheckResponse}" != '200' ]; then
+        echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
+        echo 'Please enter your Sonarr 4k URL (IE: http://127.0.0.1:8989/sonarr/):'
+        read -r providedURL
+        echo ''
+        echo 'Checking that the provided Sonarr 4k URL is valid...'
+        convert_url
+        set +e
+        sonarr4kURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        set -e
+      fi
+    done
+    echo 'Please enter your Sonarr 4K API key:'
+    read -r sonarr4kAPIKey
+    echo ''
+    echo 'Testing that the provided Sonarr 4K API Key is valid...'
+    echo ''
+    sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" |jq .[] |tr -d '"')
+    while [ "${sonarr4kAPIKeyStatus}" = 'invalid' ]; do
+      if [ "${sonarr4kAPITestResponse}" = 'Unauthorized' ]; then
+        echo -e "${red}Received something other than an OK response!${endColor}"
+        echo 'Please enter your Sonarr 4K API Key:'
+        read -r sonarr4kAPIKey
+        echo ''
+        sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" |jq .[] |tr -d '"')
+      elif [ "${sonarr4kAPITestResponse}" != 'Unauthorized' ]; then
+        sed -i.bak "${sonarr4kAPIKeyStatusLineNum} s/sonarr4kAPIKeyStatus='[^']*'/sonarr4kAPIKeyStatus='ok'/" "${scriptname}"
+        sonarr4kAPIKeyStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+      fi
+    done
+    curl -s -X GET "${convertedURL}api/profile" -H "X-Api-Key: ${sonarr4kAPIKey}" |jq . > "${rawArrProfilesFile}"
+    create_arr_profiles_list
+    prompt_for_arr_profile
+    curl -s -X GET "${convertedURL}api/rootfolder" -H "X-Api-Key: ${sonarr4kAPIKey}" |jq . > "${rawArrRootDirsFile}"
+    create_arr_root_dirs_list
+    prompt_for_arr_root_dir
+    echo 'Testing the full Sonarr 4K config for MediaButler...'
+    curl -s --location --request PUT "${userMBURL}configure/sonarr4k?" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}" \
+    --data "url=${JSONConvertedURL}&apikey=${sonarr4kAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${sonarr4kConfigFile}"
+    sonarr4kMBConfigTestResponse=$(cat "${sonarr4kConfigFile}" |jq .message |tr -d '"')
+    if [ "${sonarr4kMBConfigTestResponse}" = 'success' ]; then
+      echo -e "${grn}Success!${endColor}"
+      echo ''
+      echo 'Saving the Sonarr 4K config to MediaButler...'
+      curl -s --location --request POST "${userMBURL}configure/sonarr4k?" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" \
+      --data "url=${JSONConvertedURL}&apikey=${sonarr4kAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${sonarrConfigFile}"
+      sonarr4kMBConfigPostResponse=$(cat "${sonarr4kConfigFile}" |jq .message |tr -d '"')
+      if [ "${sonarr4kMBConfigPostResponse}" = 'success' ]; then
+        echo -e "${grn}Done! Sonarr 4K has been successfully configured for${endColor}"
+        echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
+        sleep 3
+        echo ''
+        echo 'Returning you to the Main Menu...'
+        main_menu
+      elif [ "${sonarr4kMBConfigPostResponse}" != 'success' ]; then
+        echo -e "${red}Config push failed! Please try again later.${endColor}"
+        sleep 3
+        main_menu
+      fi
+    elif [ "${sonarr4kMBConfigTestResponse}" != 'success' ]; then
+      echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
+      sleep 3
+      main_menu
+    fi
   fi
 }
 
 # Function to process Radarr configuration
 setup_radarr() {
   if [ "${radarrMenuSelection}" = '1' ]; then
-    foo
+    echo 'Please enter your Radarr URL (IE: http://127.0.0.1:8989/radarr/):'
+    read -r providedURL
+    echo ''
+    echo 'Checking that the provided Radarr URL is valid...'
+    convert_url
+    set +e
+    radarrURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    set -e
+    while [ "${radarrURLStatus}" = 'invalid' ]; do
+      if [ "${radarrURLCheckResponse}" = '200' ]; then
+        sed -i.bak "${radarrURLStatusLineNum} s/radarrURLStatus='[^']*'/radarrURLStatus='ok'/" "${scriptname}"
+        radarrURLStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+        echo ''
+      elif [ "${radarrURLCheckResponse}" != '200' ]; then
+        echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
+        echo 'Please enter your Radarr URL (IE: http://127.0.0.1:8989/radarr/):'
+        read -r providedURL
+        echo ''
+        echo 'Checking that the provided Radarr URL is valid...'
+        convert_url
+        set +e
+        radarrURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        set -e
+      fi
+    done
+    echo 'Please enter your Radarr API key:'
+    read -r radarrAPIKey
+    echo ''
+    echo 'Testing that the provided Radarr API Key is valid...'
+    echo ''
+    radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" |jq .[] |tr -d '"')
+    while [ "${radarrAPIKeyStatus}" = 'invalid' ]; do
+      if [ "${radarrAPITestResponse}" = 'Unauthorized' ]; then
+        echo -e "${red}Received something other than an OK response!${endColor}"
+        echo 'Please enter your Radarr API Key:'
+        read -r radarrAPIKey
+        echo ''
+        radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" |jq .[] |tr -d '"')
+      elif [ "${radarrAPITestResponse}" != 'Unauthorized' ]; then
+        sed -i.bak "${radarrAPIKeyStatusLineNum} s/radarrAPIKeyStatus='[^']*'/radarrAPIKeyStatus='ok'/" "${scriptname}"
+        radarrAPIKeyStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+      fi
+    done
+    curl -s -X GET "${convertedURL}api/profile" -H "X-Api-Key: ${radarrAPIKey}" |jq . > "${rawArrProfilesFile}"
+    create_arr_profiles_list
+    prompt_for_arr_profile
+    curl -s -X GET "${convertedURL}api/rootfolder" -H "X-Api-Key: ${radarrAPIKey}" |jq . > "${rawArrRootDirsFile}"
+    create_arr_root_dirs_list
+    prompt_for_arr_root_dir
+    echo 'Testing the full Radarr config for MediaButler...'
+    curl -s --location --request PUT "${userMBURL}configure/radarr?" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}" \
+    --data "url=${JSONConvertedURL}&apikey=${radarrAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${radarrConfigFile}"
+    radarrMBConfigTestResponse=$(cat "${radarrConfigFile}" |jq .message |tr -d '"')
+    if [ "${radarrMBConfigTestResponse}" = 'success' ]; then
+      echo -e "${grn}Success!${endColor}"
+      echo ''
+      echo 'Saving the Radarr config to MediaButler...'
+      curl -s --location --request POST "${userMBURL}configure/radarr?" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" \
+      --data "url=${JSONConvertedURL}&apikey=${radarrAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${radarrConfigFile}"
+      radarrMBConfigPostResponse=$(cat "${radarrConfigFile}" |jq .message |tr -d '"')
+      if [ "${radarrMBConfigPostResponse}" = 'success' ]; then
+        echo -e "${grn}Done! Radarr has been successfully configured for${endColor}"
+        echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
+        sleep 3
+        echo ''
+        echo 'Returning you to the Main Menu...'
+        main_menu
+      elif [ "${radarrMBConfigPostResponse}" != 'success' ]; then
+        echo -e "${red}Config push failed! Please try again later.${endColor}"
+        sleep 3
+        main_menu
+      fi
+    elif [ "${radarrMBConfigTestResponse}" != 'success' ]; then
+      echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
+      sleep 3
+      main_menu
+    fi
   elif [ "${radarrMenuSelection}" = '2' ]; then
-    foo
+    echo 'Please enter your Radarr 4K URL (IE: http://127.0.0.1:8989/radarr/):'
+    read -r providedURL
+    echo ''
+    echo 'Checking that the provided Radarr 4K URL is valid...'
+    convert_url
+    set +e
+    radarr4kURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    set -e
+    while [ "${radarr4kURLStatus}" = 'invalid' ]; do
+      if [ "${radarr4kURLCheckResponse}" = '200' ]; then
+        sed -i.bak "${radarr4kURLStatusLineNum} s/radarr4kURLStatus='[^']*'/radarr4kURLStatus='ok'/" "${scriptname}"
+        radarr4kURLStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+        echo ''
+      elif [ "${radarr4kURLCheckResponse}" != '200' ]; then
+        echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
+        echo 'Please enter your Radarr 4k URL (IE: http://127.0.0.1:8989/radarr/):'
+        read -r providedURL
+        echo ''
+        echo 'Checking that the provided Radarr 4k URL is valid...'
+        convert_url
+        set +e
+        radarr4kURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        set -e
+      fi
+    done
+    echo 'Please enter your Radarr 4K API key:'
+    read -r radarr4kAPIKey
+    echo ''
+    echo 'Testing that the provided Radarr 4K API Key is valid...'
+    echo ''
+    radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" |jq .[] |tr -d '"')
+    while [ "${radarr4kAPIKeyStatus}" = 'invalid' ]; do
+      if [ "${radarr4kAPITestResponse}" = 'Unauthorized' ]; then
+        echo -e "${red}Received something other than an OK response!${endColor}"
+        echo 'Please enter your Radarr 4K API Key:'
+        read -r radarr4kAPIKey
+        echo ''
+        radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" |jq .[] |tr -d '"')
+      elif [ "${radarr4kAPITestResponse}" != 'Unauthorized' ]; then
+        sed -i.bak "${radarr4kAPIKeyStatusLineNum} s/radarr4kAPIKeyStatus='[^']*'/radarr4kAPIKeyStatus='ok'/" "${scriptname}"
+        radarr4kAPIKeyStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+      fi
+    done
+    curl -s -X GET "${convertedURL}api/profile" -H "X-Api-Key: ${radarr4kAPIKey}" |jq . > "${rawArrProfilesFile}"
+    create_arr_profiles_list
+    prompt_for_arr_profile
+    curl -s -X GET "${convertedURL}api/rootfolder" -H "X-Api-Key: ${radarr4kAPIKey}" |jq . > "${rawArrRootDirsFile}"
+    create_arr_root_dirs_list
+    prompt_for_arr_root_dir
+    echo 'Testing the full Radarr 4K config for MediaButler...'
+    curl -s --location --request PUT "${userMBURL}configure/radarr4k?" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}" \
+    --data "url=${JSONConvertedURL}&apikey=${radarr4kAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${radarr4kConfigFile}"
+    radarr4kMBConfigTestResponse=$(cat "${radarr4kConfigFile}" |jq .message |tr -d '"')
+    if [ "${radarr4kMBConfigTestResponse}" = 'success' ]; then
+      echo -e "${grn}Success!${endColor}"
+      echo ''
+      echo 'Saving the Radarr 4K config to MediaButler...'
+      curl -s --location --request POST "${userMBURL}configure/radarr4k?" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" \
+      --data "url=${JSONConvertedURL}&apikey=${radarr4kAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${radarrConfigFile}"
+      radarr4kMBConfigPostResponse=$(cat "${radarr4kConfigFile}" |jq .message |tr -d '"')
+      if [ "${radarr4kMBConfigPostResponse}" = 'success' ]; then
+        echo -e "${grn}Done! Radarr 4K has been successfully configured for${endColor}"
+        echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
+        sleep 3
+        echo ''
+        echo 'Returning you to the Main Menu...'
+        main_menu
+      elif [ "${radarr4kMBConfigPostResponse}" != 'success' ]; then
+        echo -e "${red}Config push failed! Please try again later.${endColor}"
+        sleep 3
+        main_menu
+      fi
+    elif [ "${radarr4kMBConfigTestResponse}" != 'success' ]; then
+      echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
+      sleep 3
+      main_menu
+    fi
   elif [ "${radarrMenuSelection}" = '3' ]; then
-    foo
+    echo 'Please enter your Radarr 3D URL (IE: http://127.0.0.1:8989/radarr/):'
+    read -r providedURL
+    echo ''
+    echo 'Checking that the provided Radarr 3D URL is valid...'
+    convert_url
+    set +e
+    radarr3dURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    set -e
+    while [ "${radarr3dURLStatus}" = 'invalid' ]; do
+      if [ "${radarr3dURLCheckResponse}" = '200' ]; then
+        sed -i.bak "${radarr3dURLStatusLineNum} s/radarr3dURLStatus='[^']*'/radarr3dURLStatus='ok'/" "${scriptname}"
+        radarr3dURLStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+        echo ''
+      elif [ "${radarr3dURLCheckResponse}" != '200' ]; then
+        echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
+        echo 'Please enter your Radarr 4k URL (IE: http://127.0.0.1:8989/radarr/):'
+        read -r providedURL
+        echo ''
+        echo 'Checking that the provided Radarr 4k URL is valid...'
+        convert_url
+        set +e
+        radarr3dURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        set -e
+      fi
+    done
+    echo 'Please enter your Radarr 3D API key:'
+    read -r radarr3dAPIKey
+    echo ''
+    echo 'Testing that the provided Radarr 3D API Key is valid...'
+    echo ''
+    radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" |jq .[] |tr -d '"')
+    while [ "${radarr3dAPIKeyStatus}" = 'invalid' ]; do
+      if [ "${radarr3dAPITestResponse}" = 'Unauthorized' ]; then
+        echo -e "${red}Received something other than an OK response!${endColor}"
+        echo 'Please enter your Radarr 3D API Key:'
+        read -r radarr3dAPIKey
+        echo ''
+        radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" |jq .[] |tr -d '"')
+      elif [ "${radarr3dAPITestResponse}" != 'Unauthorized' ]; then
+        sed -i.bak "${radarr3dAPIKeyStatusLineNum} s/radarr3dAPIKeyStatus='[^']*'/radarr3dAPIKeyStatus='ok'/" "${scriptname}"
+        radarr3dAPIKeyStatus='ok'
+        echo -e "${grn}Success!${endColor}"
+      fi
+    done
+    curl -s -X GET "${convertedURL}api/profile" -H "X-Api-Key: ${radarr3dAPIKey}" |jq . > "${rawArrProfilesFile}"
+    create_arr_profiles_list
+    prompt_for_arr_profile
+    curl -s -X GET "${convertedURL}api/rootfolder" -H "X-Api-Key: ${radarr3dAPIKey}" |jq . > "${rawArrRootDirsFile}"
+    create_arr_root_dirs_list
+    prompt_for_arr_root_dir
+    echo 'Testing the full Radarr 3D config for MediaButler...'
+    curl -s --location --request PUT "${userMBURL}configure/radarr3d?" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}" \
+    --data "url=${JSONConvertedURL}&apikey=${radarr3dAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${radarr3dConfigFile}"
+    radarr3dMBConfigTestResponse=$(cat "${radarr3dConfigFile}" |jq .message |tr -d '"')
+    if [ "${radarr3dMBConfigTestResponse}" = 'success' ]; then
+      echo -e "${grn}Success!${endColor}"
+      echo ''
+      echo 'Saving the Radarr 3D config to MediaButler...'
+      curl -s --location --request POST "${userMBURL}configure/radarr3d?" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" \
+      --data "url=${JSONConvertedURL}&apikey=${radarr3dAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${radarrConfigFile}"
+      radarr3dMBConfigPostResponse=$(cat "${radarr3dConfigFile}" |jq .message |tr -d '"')
+      if [ "${radarr3dMBConfigPostResponse}" = 'success' ]; then
+        echo -e "${grn}Done! Radarr 3D has been successfully configured for${endColor}"
+        echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
+        sleep 3
+        echo ''
+        echo 'Returning you to the Main Menu...'
+        main_menu
+      elif [ "${radarr3dMBConfigPostResponse}" != 'success' ]; then
+        echo -e "${red}Config push failed! Please try again later.${endColor}"
+        sleep 3
+        main_menu
+      fi
+    elif [ "${radarr3dMBConfigTestResponse}" != 'success' ]; then
+      echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
+      sleep 3
+      main_menu
+    fi
   fi
 }
 
@@ -670,7 +1006,7 @@ setup_tautulli() {
   set -e
   while [ "${tautulliURLStatus}" = 'invalid' ]; do
     if [ "${tautulliURLCheckResponse}" = '200' ]; then
-      sed -i"" "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='ok'/" "${scriptname}"
+      sed -i.bak "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='ok'/" "${scriptname}"
       tautulliURLStatus='ok'
       echo -e "${grn}Success!${endColor}"
       echo ''
@@ -694,7 +1030,7 @@ setup_tautulli() {
   tautulliAPITestResponse=$(curl -s "${convertedURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
   while [ "${tautulliAPIKeyStatus}" = 'invalid' ]; do
     if [ "${tautulliAPITestResponse}" = 'null' ]; then
-      sed -i"" "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='ok'/" "${scriptname}"
+      sed -i.bak "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='ok'/" "${scriptname}"
       tautulliAPIKeyStatus='ok'
       echo -e "${grn}Success!${endColor}"
       echo ''
@@ -748,7 +1084,7 @@ main() {
   create_dir
   get_line_numbers
   if [[ -e "${plexCredsFile}" ]]; then
-    sed -i"" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+    sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
   elif [[ ! -f "${plexCredsFile}" ]]; then
     get_plex_creds
     check_plex_creds
