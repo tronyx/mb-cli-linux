@@ -104,7 +104,7 @@ check_bash() {
 
 # Function to check Sed is >= and, if not,  exit w/ message
 check_sed() {
-  if [ "$[packageManager]" = 'mac' ]; then
+  if [ "${packageManager}" = 'mac' ]; then
     sedMajorVersion=$(gsed --version |head -1 |awk '{print $4}' |cut -c1)
   else
     sedMajorVersion=$(sed --version |head -1 |awk '{print $4}' |cut -c1)
@@ -112,7 +112,7 @@ check_sed() {
   if [ "${sedMajorVersion}" -lt '4' ]; then
     echo -e "${red}This script requires Sed v4 or higher!${endColor}"
     echo -e "${ylw}Please upgrade Sed on this system and then try again.${endColor}"
-    if [ "$[packageManager]" = 'mac' ]; then
+    if [ "${packageManager}" = 'mac' ]; then
       echo -e "${ylw}If you are on a Mac you will need to install/upgrade gnu-sed.${endColor}"
     else
       :
@@ -149,7 +149,7 @@ check_curl() {
     echo -e "${ylw}Doing it for you now...${endColor}"
     if [ "${packageManager}" = 'apk' ]; then
       apk add --no-cache curl
-    elif [ "$[packageManager]" = 'mac' ]; then
+    elif [ "${packageManager}" = 'mac' ]; then
       /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" && /usr/local/bin/brew install jq
     else
       "${packageManager}" install curl
@@ -174,7 +174,7 @@ check_jq() {
     echo -e "${ylw}Doing it for you now...${endColor}"
     if [ "${packageManager}" = 'apk' ]; then
       apk add --no-cache jq
-    elif [ "$[packageManager]" = 'mac' ]; then
+    elif [ "${packageManager}" = 'mac' ]; then
       /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" && /usr/local/bin/brew install jq
     else
       "${packageManager}" install jq
@@ -193,6 +193,7 @@ check_jq() {
 
 # Function to bundle checks
 checks() {
+  root_check
   check_bash
   package_manager
   check_curl
@@ -212,7 +213,7 @@ cleanup() {
 }
 
 # Exit the script if the user hits CTRL+C
-function control_c() {#cleanup
+function control_c() {
   exit
 }
 trap 'control_c' 2
@@ -273,15 +274,17 @@ get_plex_creds() {
     read -r plexUsername
     echo ''
     echo 'Please enter your Plex password:'
-    while IFS= read -rs -n1 plexPassword; do
-      if [[ -z "${plexPassword}" ]]; then
-        echo
-        break
-      else
-        echo -n '*'
-        password+=${plexPassword}
-      fi
-    done
+    read -rs plexPassword
+    #unset password;
+    #while IFS= read -rs -n1 plexPassword; do
+    #  if [[ -z "${plexPassword}" ]]; then
+    #    echo
+    #    break
+    #  else
+    #    echo -n '*'
+    #    password+=${plexPassword}
+    #  fi
+    #done
     echo ''
   elif [ "${plexCredsOption}" == '2' ]; then
     echo 'Please enter your Plex token:'
@@ -461,7 +464,7 @@ sonarr_menu() {
   echo '*****************************************'
   echo '*           Sonarr Setup Menu           *'
   echo '*****************************************'
-  echo 'Please choose which version of Radarr you'
+  echo 'Please choose which version of Sonarr you'
   echo 'would like to configure for MediaButler: '
   echo ''
   echo '1) Sonarr'
@@ -559,7 +562,9 @@ setup_sonarr() {
     echo ''
     echo 'Checking that the provided Sonarr URL is valid...'
     convert_url
-    sonarrURLCheckResponse=$(curl -sI "${convertedURL}" |grep -vi mono |grep HTTP |awk '{print $2}')
+    set +e
+    sonarrURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    set -e
     while [ "${sonarrURLStatus}" = 'invalid' ]; do
       if [ "${sonarrURLCheckResponse}" = '200' ]; then
         sed -i'' "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
@@ -573,7 +578,9 @@ setup_sonarr() {
         echo ''
         echo 'Checking that the provided Sonarr URL is valid...'
         convert_url
-        sonarrURLCheckResponse=$(curl -sI "${convertedURL}" |grep -vi mono |grep HTTP |awk '{print $2}')
+        set +e
+        sonarrURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        set -e
       fi
     done
     echo 'Please enter your Sonarr API key:'
@@ -658,7 +665,9 @@ setup_tautulli() {
   echo ''
   echo 'Checking that the provided Tautulli URL is valid...'
   convert_url
-  tautulliURLCheckResponse=$(curl -sI "${convertedURL}"auth/login |grep HTTP |awk '{print $2}')
+  set +e
+  tautulliURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
+  set -e
   while [ "${tautulliURLStatus}" = 'invalid' ]; do
     if [ "${tautulliURLCheckResponse}" = '200' ]; then
       sed -i'' "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='ok'/" "${scriptname}"
@@ -672,7 +681,9 @@ setup_tautulli() {
       echo ''
       echo 'Checking that the provided Tautulli URL is valid...'
       convert_url
-      tautulliURLCheckResponse=$(curl -sI "${convertedURL}"auth/login |grep HTTP |awk '{print $2}')
+      set +e
+      tautulliURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
+      set -e
     fi
   done
   echo 'Please enter your Tautulli API key:'
@@ -736,25 +747,25 @@ main() {
   checks
   create_dir
   get_line_numbers
-  if [[ -e "${plexCredsFile}" ]]; then
-    sed -i'' "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
-  elif [[ ! -f "${plexCredsFile}" ]]; then
+  #if [[ -e "${plexCredsFile}" ]]; then
+  #  sed -i'' "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+  #elif [[ ! -f "${plexCredsFile}" ]]; then
     get_plex_creds
     check_plex_creds
-  fi
-  if [[ -e "${plexTokenFile}" ]]; then
-    plexToken=$(cat "${plexTokenFile}")
-  elif [[ ! -f "${plexTokenFile}" ]]; then
+  #fi
+  #if [[ -e "${plexTokenFile}" ]]; then
+  #  plexToken=$(cat "${plexTokenFile}")
+  #elif [[ ! -f "${plexTokenFile}" ]]; then
     get_plex_token
-  fi
-  if [[ -e "${plexServersFile}" ]]; then
-    plexServerMachineID=$(cat "${plexServerMachineIDFile}")
-    userMBURL=$(cat "${userMBURLFile}")
-    plexServerMBToken=$(cat "${plexServerMBTokenFile}")
-  elif [[ ! -f "${plexServersFile}" ]]; then
+  #fi
+  #if [[ -e "${plexServersFile}" ]]; then
+  #  plexServerMachineID=$(cat "${plexServerMachineIDFile}")
+  #  userMBURL=$(cat "${userMBURLFile}")
+  #  plexServerMBToken=$(cat "${plexServerMBTokenFile}")
+  #elif [[ ! -f "${plexServersFile}" ]]; then
     create_plex_servers_list
     prompt_for_plex_server
-  fi
+  #fi
   main_menu
 }
 
