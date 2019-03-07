@@ -36,6 +36,7 @@ tempDir='/tmp/mb_setup/'
 plexCredsFile="${tempDir}plex_creds_check.txt"
 plexTokenFile="${tempDir}plex_token.txt"
 plexServerMachineIDFile="${tempDir}plex_machineID.txt"
+selectedPlexServerNameFile="${tempDir}plex_server_name.txt"
 userMBURLFile="${tempDir}user_mb_url.txt"
 plexServerMBTokenFile="${tempDir}plex_server_mb_token.txt"
 plexServersFile="${tempDir}plex_server_list.txt"
@@ -285,6 +286,7 @@ get_plex_creds() {
       plexPassword+="${char}"
     done
     echo ''
+    echo ''
   elif [ "${plexCredsOption}" == '2' ]; then
     unset plexToken
     echo 'Please enter your Plex token:'
@@ -296,6 +298,7 @@ get_plex_creds() {
       prompt='*'
       plexToken+="${char}"
     done
+    echo ''
     echo ''
   else
     echo 'You provided an invalid option, please try again.'
@@ -422,6 +425,7 @@ prompt_for_plex_server() {
     echo 'Please enter the correct MediaButler URL:'
     read -r userMBURL
   fi
+  echo "${selectedPlexServerName}" > "${selectedPlexServerNameFile}"
   echo "${plexServerMachineID}" > "${plexServerMachineIDFile}"
   echo "${userMBURL}" > "${userMBURLFile}"
   echo "${plexServerMBToken}" > "${plexServerMBTokenFile}"
@@ -551,7 +555,7 @@ prompt_for_arr_profile() {
   echo ''
   cat "${numberedArrProfilesFile}"
   echo ''
-  read -p "Profile (1-${numberOfOptions}):" arrProfilesSelection
+  read -p "Profile (1-${numberOfOptions}): " arrProfilesSelection
   echo ''
   arrProfilesArrayElement=$((${arrProfilesSelection}-1))
   selectedArrProfile=$(jq .["${arrProfilesArrayElement}"].name "${rawArrProfilesFile}" |tr -d '"')
@@ -575,7 +579,7 @@ prompt_for_arr_root_dir() {
   echo ''
   cat "${numberedArrRootDirsFile}"
   echo ''
-  read -p "Root Dir (1-${numberOfOptions}):" arrRootDirsSelection
+  read -p "Root Dir (1-${numberOfOptions}): " arrRootDirsSelection
   echo ''
   arrRootDirsArrayElement=$((${arrRootDirsSelection}-1))
   selectedArrRootDir=$(jq .["${arrRootDirsArrayElement}"].path "${rawArrRootDirsFile}" |tr -d '"')
@@ -589,6 +593,7 @@ setup_sonarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Sonarr URL is valid...'
+    echo ''
     convert_url
     set +e
     sonarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -605,6 +610,7 @@ setup_sonarr() {
         read -r providedURL
         echo ''
         echo 'Checking that the provided Sonarr URL is valid...'
+        echo ''
         convert_url
         set +e
         sonarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -622,6 +628,7 @@ setup_sonarr() {
       sonarrAPIKey+="${char}"
     done
     echo ''
+    echo ''
     echo 'Testing that the provided Sonarr API Key is valid...'
     echo ''
     sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
@@ -638,6 +645,7 @@ setup_sonarr() {
           prompt='*'
           sonarrAPIKey+="${char}"
         done
+        echo ''
         echo ''
         sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
       elif [ "${sonarrAPITestResponse}" != 'Unauthorized' ]; then
@@ -692,6 +700,7 @@ setup_sonarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Sonarr 4K URL is valid...'
+    echo ''
     convert_url
     set +e
     sonarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -708,6 +717,7 @@ setup_sonarr() {
         read -r providedURL
         echo ''
         echo 'Checking that the provided Sonarr 4k URL is valid...'
+        echo ''
         convert_url
         set +e
         sonarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -725,6 +735,7 @@ setup_sonarr() {
       sonarr4kAPIKey+="${char}"
     done
     echo ''
+    echo ''
     echo 'Testing that the provided Sonarr 4K API Key is valid...'
     echo ''
     sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" |jq .[] |tr -d '"')
@@ -741,6 +752,7 @@ setup_sonarr() {
           prompt='*'
           sonarr4kAPIKey+="${char}"
         done
+        echo ''
         echo ''
         sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" |jq .[] |tr -d '"')
       elif [ "${sonarr4kAPITestResponse}" != 'Unauthorized' ]; then
@@ -800,6 +812,7 @@ setup_radarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Radarr URL is valid...'
+    echo ''
     convert_url
     set +e
     radarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -816,6 +829,7 @@ setup_radarr() {
         read -r providedURL
         echo ''
         echo 'Checking that the provided Radarr URL is valid...'
+        echo ''
         convert_url
         set +e
         radarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -833,6 +847,7 @@ setup_radarr() {
       radarrAPIKey+="${char}"
     done
     echo ''
+    echo ''
     echo 'Testing that the provided Radarr API Key is valid...'
     echo ''
     radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" |jq .[] |tr -d '"')
@@ -849,6 +864,7 @@ setup_radarr() {
           prompt='*'
           radarrAPIKey+="${char}"
         done
+        echo ''
         echo ''
         radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" |jq .[] |tr -d '"')
       elif [ "${radarrAPITestResponse}" != 'Unauthorized' ]; then
@@ -903,6 +919,7 @@ setup_radarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Radarr 4K URL is valid...'
+    echo ''
     convert_url
     set +e
     radarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -919,6 +936,7 @@ setup_radarr() {
         read -r providedURL
         echo ''
         echo 'Checking that the provided Radarr 4k URL is valid...'
+        echo ''
         convert_url
         set +e
         radarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -936,6 +954,7 @@ setup_radarr() {
       radarr4kAPIKey+="${char}"
     done
     echo ''
+    echo ''
     echo 'Testing that the provided Radarr 4K API Key is valid...'
     echo ''
     radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" |jq .[] |tr -d '"')
@@ -952,6 +971,7 @@ setup_radarr() {
           prompt='*'
           radarr4kAPIKey+="${char}"
         done
+        echo ''
         echo ''
         radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" |jq .[] |tr -d '"')
       elif [ "${radarr4kAPITestResponse}" != 'Unauthorized' ]; then
@@ -1006,6 +1026,7 @@ setup_radarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Radarr 3D URL is valid...'
+    echo ''
     convert_url
     set +e
     radarr3dURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -1022,6 +1043,7 @@ setup_radarr() {
         read -r providedURL
         echo ''
         echo 'Checking that the provided Radarr 4k URL is valid...'
+        echo ''
         convert_url
         set +e
         radarr3dURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -1039,6 +1061,7 @@ setup_radarr() {
       radarr3dAPIKey+="${char}"
     done
     echo ''
+    echo ''
     echo 'Testing that the provided Radarr 3D API Key is valid...'
     echo ''
     radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" |jq .[] |tr -d '"')
@@ -1055,6 +1078,7 @@ setup_radarr() {
           prompt='*'
           radarr3dAPIKey+="${char}"
         done
+        echo ''
         echo ''
         radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" |jq .[] |tr -d '"')
       elif [ "${radarr3dAPITestResponse}" != 'Unauthorized' ]; then
@@ -1113,6 +1137,7 @@ setup_tautulli() {
   read -r providedURL
   echo ''
   echo 'Checking that the provided Tautulli URL is valid...'
+  echo ''
   convert_url
   set +e
   tautulliURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
@@ -1129,6 +1154,7 @@ setup_tautulli() {
       read -r providedURL
       echo ''
       echo 'Checking that the provided Tautulli URL is valid...'
+      echo ''
       convert_url
       set +e
       tautulliURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
@@ -1145,6 +1171,7 @@ setup_tautulli() {
     prompt='*'
     tautulliAPIKey+="${char}"
   done
+  echo ''
   echo ''
   echo 'Testing that the provided Tautulli API Key is valid...'
   echo ''
@@ -1167,6 +1194,7 @@ setup_tautulli() {
         prompt='*'
         tautulliAPIKey+="${char}"
       done
+      echo ''
       echo ''
       tautulliAPITestResponse=$(curl -s "${convertedURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
     fi
@@ -1224,6 +1252,7 @@ main() {
     get_plex_token
   fi
   if [[ -e "${plexServersFile}" ]]; then
+    selectedPlexServerName=$(cat "${selectedPlexServerNameFile}")
     plexServerMachineID=$(cat "${plexServerMachineIDFile}")
     userMBURL=$(cat "${userMBURLFile}")
     plexServerMBToken=$(cat "${plexServerMBTokenFile}")
