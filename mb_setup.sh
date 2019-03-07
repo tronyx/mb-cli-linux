@@ -91,6 +91,37 @@ root_check() {
   fi
 }
 
+# Function to check Bash is >=4 and, if not, exit w/ message
+check_bash() {
+  bashMajorVersion=$(bash --version |grep -v grep |grep release |awk '{print $4}' |cut -c1)
+  if [ "${bashMajorVersion}" -lt '4' ]; then
+    echo -e "${red}This script requires Bash v4 or higher!${endColor}"
+    echo -e "${ylw}Please upgrade Bash on this system and then try again.${endColor}"
+  elif [ "${bashMajorVersion}" -ge '4' ]; then
+    :
+  fi
+}
+
+# Function to check Sed is >= and, if not,  exit w/ message
+check_sed() {
+  if [ "$[packageManager]" = 'mac' ]; then
+    sedMajorVersion=$(gsed --version |head -1 |awk '{print $4}' |cut -c1)
+  else
+    sedMajorVersion=$(sed --version |head -1 |awk '{print $4}' |cut -c1)
+  fi
+  if [ "${sedMajorVersion}" -lt '4' ]; then
+    echo -e "${red}This script requires Sed v4 or higher!${endColor}"
+    echo -e "${ylw}Please upgrade Sed on this system and then try again.${endColor}"
+    if [ "$[packageManager]" = 'mac' ]; then
+      echo -e "${ylw}If you are on a Mac you will need to install/upgrade gnu-sed.${endColor}"
+    else
+      :
+    fi
+  elif [ "${sedMajorVersion}" -ge '4' ]; then
+    :
+  fi
+}
+
 # Function to determine which Package Manager to use
 package_manager() {
   declare -A osInfo;
@@ -160,22 +191,29 @@ check_jq() {
   fi
 }
 
+# Function to bundle checks
+checks() {
+  check_bash
+  package_manager
+  check_curl
+  check_jq
+  check_sed
+}
+
 # Create directory to neatly store temp files
 create_dir() {
-    mkdir -p "${tempDir}"
-    chmod 777 "${tempDir}"
+  mkdir -p "${tempDir}"
+  chmod 777 "${tempDir}"
 }
 
 # Cleanup temp files
 cleanup() {
-    rm -rf "${tempDir}"*.txt || true
+  rm -rf "${tempDir}"*.txt || true
 }
-#trap 'cleanup' 0 1 3 6 14 15
 
 # Exit the script if the user hits CTRL+C
-function control_c() {
-    #cleanup
-    exit
+function control_c() {#cleanup
+  exit
 }
 trap 'control_c' 2
 
@@ -235,7 +273,15 @@ get_plex_creds() {
     read -r plexUsername
     echo ''
     echo 'Please enter your Plex password:'
-    read -rs plexPassword
+    while IFS= read -rs -n1 plexPassword; do
+      if [[ -z "${plexPassword}" ]]; then
+        echo
+        break
+      else
+        echo -n '*'
+        password+=${plexPassword}
+      fi
+    done
     echo ''
   elif [ "${plexCredsOption}" == '2' ]; then
     echo 'Please enter your Plex token:'
@@ -380,10 +426,6 @@ convert_url() {
 
 # Function to display the main menu
 main_menu(){
-  plexToken=$(cat "${plexTokenFile}")
-  plexServerMachineID=$(cat "${plexServerMachineIDFile}")
-  userMBURL=$(cat "${userMBURLFile}")
-  plexServerMBToken=$(cat "${plexServerMBTokenFile}")
   echo '*****************************************'
   echo '*               Main Menu               *'
   echo '*****************************************'
@@ -516,11 +558,6 @@ setup_sonarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Sonarr URL is valid...'
-    #if [[ "${sonarrURL: -1}" = '/' ]]; then
-    #  convertedSonarrURL=$(echo "${sonarrURL}")
-    #elif [[ "${sonarrURL: -1}" != '/' ]]; then
-    #  convertedSonarrURL=$(sonarrURL+=\/; echo "${sonarrURL}")
-    #fi
     convert_url
     sonarrURLCheckResponse=$(curl -sI "${convertedURL}" |grep -vi mono |grep HTTP |awk '{print $2}')
     while [ "${sonarrURLStatus}" = 'invalid' ]; do
@@ -565,7 +602,6 @@ setup_sonarr() {
     create_arr_root_dirs_list
     prompt_for_arr_root_dir
     echo 'Testing the full Sonarr config for MediaButler...'
-    #JSONConvertedSonarrURL=$(echo "${sonarrURL}" |sed 's/:/%3A/g')
     curl -s --location --request PUT "${userMBURL}configure/sonarr?" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
@@ -621,11 +657,6 @@ setup_tautulli() {
   read -r providedURL
   echo ''
   echo 'Checking that the provided Tautulli URL is valid...'
-  #if [[ "${tautulliURL: -1}" = '/' ]]; then
-  #  convertedTautulliURL=$(echo "${tautulliURL}")
-  #elif [[ "${tautulliURL: -1}" != '/' ]]; then
-  #  convertedTautulliURL=$(tautulliURL+=\/; echo "${tautulliURL}")
-  #fi
   convert_url
   tautulliURLCheckResponse=$(curl -sI "${convertedURL}"auth/login |grep HTTP |awk '{print $2}')
   while [ "${tautulliURLStatus}" = 'invalid' ]; do
@@ -665,7 +696,6 @@ setup_tautulli() {
     fi
   done
   echo 'Testing the full Tautulli config for MediaButler...'
-  #JSONConvertedTautulliURL=$(echo "${tautulliURL}" |sed 's/:/%3A/g')
   curl -s --location --request PUT "${userMBURL}configure/tautulli?" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -H "${mbClientID}" \
@@ -703,10 +733,7 @@ setup_tautulli() {
 
 # Main function to run all functions
 main() {
-  root_check
-  package_manager
-  check_curl
-  check_jq
+  checks
   create_dir
   get_line_numbers
   if [[ -e "${plexCredsFile}" ]]; then
@@ -716,31 +743,19 @@ main() {
     check_plex_creds
   fi
   if [[ -e "${plexTokenFile}" ]]; then
-    :
+    plexToken=$(cat "${plexTokenFile}")
   elif [[ ! -f "${plexTokenFile}" ]]; then
     get_plex_token
   fi
   if [[ -e "${plexServersFile}" ]]; then
-    :
+    plexServerMachineID=$(cat "${plexServerMachineIDFile}")
+    userMBURL=$(cat "${userMBURLFile}")
+    plexServerMBToken=$(cat "${plexServerMBTokenFile}")
   elif [[ ! -f "${plexServersFile}" ]]; then
     create_plex_servers_list
     prompt_for_plex_server
   fi
   main_menu
-  #if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5)$ ]]; then
-  #  echo -e "${red}You did not specify a valid option!${endColor}"
-  #  main_menu
-  #elif [ "${mainMenuSelection}" = '1' ]; then
-  #  sonarr_menu
-  #elif [ "${mainMenuSelection}" = '2' ]; then
-  #  radarr_menu
-  #elif [ "${mainMenuSelection}" = '3' ]; then
-  #  setup_tautulli
-  #elif [ "${mainMenuSelection}" = '4' ]; then
-  #  reset
-  #elif [ "${mainMenuSelection}" = '5' ]; then
-  #  exit_menu
-  #fi
 }
 
 main
