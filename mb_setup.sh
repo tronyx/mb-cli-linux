@@ -93,7 +93,7 @@ root_check() {
 
 # Function to check Bash is >=4 and, if not, exit w/ message
 check_bash() {
-  bashMajorVersion=$(bash --version |grep -v grep |grep release |awk '{print $4}' |cut -c1)
+  bashMajorVersion=$(bash --version | grep -Po 'bash, version \K\w+')
   if [ "${bashMajorVersion}" -lt '4' ]; then
     echo -e "${red}This script requires Bash v4 or higher!${endColor}"
     echo -e "${ylw}Please upgrade Bash on this system and then try again.${endColor}"
@@ -107,7 +107,7 @@ check_sed() {
   if [ "${packageManager}" = 'mac' ]; then
     sedMajorVersion=$(gsed --version |head -1 |awk '{print $4}' |cut -c1)
   else
-    sedMajorVersion=$(sed --version |head -1 |awk '{print $4}' |cut -c1)
+    sedMajorVersion=$(sed --version | grep -Po '.* \K\d+(?=(\.\d+)+)')
   fi
   if [ "${sedMajorVersion}" -lt '4' ]; then
     echo -e "${red}This script requires Sed v4 or higher!${endColor}"
@@ -274,22 +274,28 @@ get_plex_creds() {
     echo 'Please enter your Plex username:'
     read -r plexUsername
     echo ''
+    unset plexPassword
     echo 'Please enter your Plex password:'
-    read -rs plexPassword
-    #unset password;
-    #while IFS= read -rs -n1 plexPassword; do
-    #  if [[ -z "${plexPassword}" ]]; then
-    #    echo
-    #    break
-    #  else
-    #    echo -n '*'
-    #    password+=${plexPassword}
-    #  fi
-    #done
+    while IFS= read -p "${prompt}" -r -s -n 1 char
+    do
+      if [[ "${char}" == $'\0' ]]; then
+        break
+      fi
+      prompt='*'
+      plexPassword+="${char}"
+    done
     echo ''
   elif [ "${plexCredsOption}" == '2' ]; then
+    unset plexToken
     echo 'Please enter your Plex token:'
-    read -rs plexToken
+    while IFS= read -p "${prompt}" -r -s -n 1 char
+    do
+      if [[ "${char}" == $'\0' ]]; then
+        break
+      fi
+      prompt='*'
+      plexToken+="${char}"
+    done
     echo ''
   else
     echo 'You provided an invalid option, please try again.'
@@ -311,8 +317,17 @@ check_plex_creds() {
         echo ''
         echo 'Please enter your Plex username:'
         read -r plexUsername
+        echo ''
+        unset plexPassword
         echo 'Please enter your Plex password:'
-        read -rs plexPassword
+        while IFS= read -p "${prompt}" -r -s -n 1 char
+        do
+          if [[ "${char}" == $'\0' ]]; then
+            break
+          fi
+          prompt='*'
+          plexPassword+="${char}"
+        done
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
         sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
         plexCredsStatus='ok'
@@ -328,8 +343,16 @@ check_plex_creds() {
       if [[ "${authResponse}" =~ 'BadRequest' ]]; then
         echo -e "${red}The credentials that you provided are not valid!${endColor}"
         echo ''
+        unset plexToken
         echo 'Please enter your Plex token:'
-        read -rs plexToken
+        while IFS= read -p "${prompt}" -r -s -n 1 char
+        do
+          if [[ "${char}" == $'\0' ]]; then
+            break
+          fi
+          prompt='*'
+          plexToken+="${char}"
+        done
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
         sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
         plexCredsStatus='ok'
@@ -357,6 +380,7 @@ get_plex_token() {
 # Function to create list of Plex servers
 create_plex_servers_list() {
   jq .servers[].name "${plexCredsFile}" |tr -d '"' > "${plexServersFile}"
+  plexServers=''
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'plexServers=($(cat "${plexServersFile}"))'
   for ((i = 0; i < ${#plexServers[@]}; ++i)); do
     position=$(( $i + 1 ))
@@ -512,6 +536,7 @@ radarr_menu() {
 # Function to create list of Sonarr/Radarr profiles
 create_arr_profiles_list() {
   jq .[].name "${rawArrProfilesFile}" |tr -d '"' > "${arrProfilesFile}"
+  arrProfiles=''
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'arrProfiles=($(cat "${arrProfilesFile}"))'
   for ((i = 0; i < ${#arrProfiles[@]}; ++i)); do
     position=$(( $i + 1 ))
@@ -535,6 +560,7 @@ prompt_for_arr_profile() {
 # Function to create list of Sonarr/Radarr root directories
 create_arr_root_dirs_list() {
   jq .[].path "${rawArrRootDirsFile}" |tr -d '"' > "${arrRootDirsFile}"
+  arrRootDirs=''
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'arrRootDirs=($(cat "${arrRootDirsFile}"))'
   for ((i = 0; i < ${#arrRootDirs[@]}; ++i)); do
     position=$(( $i + 1 ))
@@ -558,13 +584,14 @@ prompt_for_arr_root_dir() {
 # Function to process Sonarr configuration
 setup_sonarr() {
   if [ "${sonarrMenuSelection}" = '1' ]; then
+    mbAPIEndpoint='sonarr'
     echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
     read -r providedURL
     echo ''
     echo 'Checking that the provided Sonarr URL is valid...'
     convert_url
     set +e
-    sonarrURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    sonarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
     set -e
     while [ "${sonarrURLStatus}" = 'invalid' ]; do
       if [ "${sonarrURLCheckResponse}" = '200' ]; then
@@ -580,21 +607,37 @@ setup_sonarr() {
         echo 'Checking that the provided Sonarr URL is valid...'
         convert_url
         set +e
-        sonarrURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        sonarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
         set -e
       fi
     done
+    unset sonarrAPIKey
     echo 'Please enter your Sonarr API key:'
-    read -r sonarrAPIKey
+    while IFS= read -p "${prompt}" -r -s -n 1 char
+    do
+      if [[ "${char}" == $'\0' ]]; then
+        break
+      fi
+      prompt='*'
+      sonarrAPIKey+="${char}"
+    done
     echo ''
     echo 'Testing that the provided Sonarr API Key is valid...'
     echo ''
     sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
     while [ "${sonarrAPIKeyStatus}" = 'invalid' ]; do
       if [ "${sonarrAPITestResponse}" = 'Unauthorized' ]; then
-        echo -e "${red}Received something other than an OK response!${endColor}"
-        echo 'Please enter your Sonarr API Key:'
-        read -r sonarrAPIKey
+        echo -e "${red}There was an error while attempting to validate the provided API key!${endColor}"
+        unset sonarrAPIKey
+        echo 'Please enter your Sonarr API key:'
+        while IFS= read -p "${prompt}" -r -s -n 1 char
+        do
+          if [[ "${char}" == $'\0' ]]; then
+            break
+          fi
+          prompt='*'
+          sonarrAPIKey+="${char}"
+        done
         echo ''
         sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
       elif [ "${sonarrAPITestResponse}" != 'Unauthorized' ]; then
@@ -610,7 +653,7 @@ setup_sonarr() {
     create_arr_root_dirs_list
     prompt_for_arr_root_dir
     echo 'Testing the full Sonarr config for MediaButler...'
-    curl -s --location --request PUT "${userMBURL}configure/sonarr?" \
+    curl -s --location --request PUT "${userMBURL}configure/${mbAPIEndpoint}?" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -620,7 +663,7 @@ setup_sonarr() {
       echo -e "${grn}Success!${endColor}"
       echo ''
       echo 'Saving the Sonarr config to MediaButler...'
-      curl -s --location --request POST "${userMBURL}configure/sonarr?" \
+      curl -s --location --request POST "${userMBURL}configure/${mbAPIEndpoint}?" \
       -H "Content-Type: application/x-www-form-urlencoded" \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -644,13 +687,14 @@ setup_sonarr() {
       main_menu
     fi
   elif [ "${sonarrMenuSelection}" = '2' ]; then
+    mbAPIEndpoint='sonarr4k'
     echo 'Please enter your Sonarr 4K URL (IE: http://127.0.0.1:8989/sonarr/):'
     read -r providedURL
     echo ''
     echo 'Checking that the provided Sonarr 4K URL is valid...'
     convert_url
     set +e
-    sonarr4kURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    sonarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
     set -e
     while [ "${sonarr4kURLStatus}" = 'invalid' ]; do
       if [ "${sonarr4kURLCheckResponse}" = '200' ]; then
@@ -666,21 +710,37 @@ setup_sonarr() {
         echo 'Checking that the provided Sonarr 4k URL is valid...'
         convert_url
         set +e
-        sonarr4kURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        sonarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
         set -e
       fi
     done
+    unset sonarr4kAPIKey
     echo 'Please enter your Sonarr 4K API key:'
-    read -r sonarr4kAPIKey
+    while IFS= read -p "${prompt}" -r -s -n 1 char
+    do
+      if [[ "${char}" == $'\0' ]]; then
+        break
+      fi
+      prompt='*'
+      sonarr4kAPIKey+="${char}"
+    done
     echo ''
     echo 'Testing that the provided Sonarr 4K API Key is valid...'
     echo ''
     sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" |jq .[] |tr -d '"')
     while [ "${sonarr4kAPIKeyStatus}" = 'invalid' ]; do
       if [ "${sonarr4kAPITestResponse}" = 'Unauthorized' ]; then
-        echo -e "${red}Received something other than an OK response!${endColor}"
-        echo 'Please enter your Sonarr 4K API Key:'
-        read -r sonarr4kAPIKey
+        echo -e "${red}There was an error while attempting to validate the provided API key!${endColor}"
+        unset sonarr4kAPIKey
+        echo 'Please enter your Sonarr 4K API key:'
+        while IFS= read -p "${prompt}" -r -s -n 1 char
+        do
+          if [[ "${char}" == $'\0' ]]; then
+            break
+          fi
+          prompt='*'
+          sonarr4kAPIKey+="${char}"
+        done
         echo ''
         sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" |jq .[] |tr -d '"')
       elif [ "${sonarr4kAPITestResponse}" != 'Unauthorized' ]; then
@@ -696,7 +756,7 @@ setup_sonarr() {
     create_arr_root_dirs_list
     prompt_for_arr_root_dir
     echo 'Testing the full Sonarr 4K config for MediaButler...'
-    curl -s --location --request PUT "${userMBURL}configure/sonarr4k?" \
+    curl -s --location --request PUT "${userMBURL}configure/${mbAPIEndpoint}?" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -706,7 +766,7 @@ setup_sonarr() {
       echo -e "${grn}Success!${endColor}"
       echo ''
       echo 'Saving the Sonarr 4K config to MediaButler...'
-      curl -s --location --request POST "${userMBURL}configure/sonarr4k?" \
+      curl -s --location --request POST "${userMBURL}configure/${mbAPIEndpoint}?" \
       -H "Content-Type: application/x-www-form-urlencoded" \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -735,13 +795,14 @@ setup_sonarr() {
 # Function to process Radarr configuration
 setup_radarr() {
   if [ "${radarrMenuSelection}" = '1' ]; then
+    mbAPIEndpoint='radarr'
     echo 'Please enter your Radarr URL (IE: http://127.0.0.1:8989/radarr/):'
     read -r providedURL
     echo ''
     echo 'Checking that the provided Radarr URL is valid...'
     convert_url
     set +e
-    radarrURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    radarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
     set -e
     while [ "${radarrURLStatus}" = 'invalid' ]; do
       if [ "${radarrURLCheckResponse}" = '200' ]; then
@@ -757,21 +818,37 @@ setup_radarr() {
         echo 'Checking that the provided Radarr URL is valid...'
         convert_url
         set +e
-        radarrURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        radarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
         set -e
       fi
     done
+    unset radarrAPIKey
     echo 'Please enter your Radarr API key:'
-    read -r radarrAPIKey
+    while IFS= read -p "${prompt}" -r -s -n 1 char
+    do
+      if [[ "${char}" == $'\0' ]]; then
+        break
+      fi
+      prompt='*'
+      radarrAPIKey+="${char}"
+    done
     echo ''
     echo 'Testing that the provided Radarr API Key is valid...'
     echo ''
     radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" |jq .[] |tr -d '"')
     while [ "${radarrAPIKeyStatus}" = 'invalid' ]; do
       if [ "${radarrAPITestResponse}" = 'Unauthorized' ]; then
-        echo -e "${red}Received something other than an OK response!${endColor}"
-        echo 'Please enter your Radarr API Key:'
-        read -r radarrAPIKey
+        echo -e "${red}There was an error while attempting to validate the provided API key!${endColor}"
+        unset radarrAPIKey
+        echo 'Please enter your Radarr API key:'
+        while IFS= read -p "${prompt}" -r -s -n 1 char
+        do
+          if [[ "${char}" == $'\0' ]]; then
+            break
+          fi
+          prompt='*'
+          radarrAPIKey+="${char}"
+        done
         echo ''
         radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" |jq .[] |tr -d '"')
       elif [ "${radarrAPITestResponse}" != 'Unauthorized' ]; then
@@ -787,7 +864,7 @@ setup_radarr() {
     create_arr_root_dirs_list
     prompt_for_arr_root_dir
     echo 'Testing the full Radarr config for MediaButler...'
-    curl -s --location --request PUT "${userMBURL}configure/radarr?" \
+    curl -s --location --request PUT "${userMBURL}configure/${mbAPIEndpoint}?" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -797,7 +874,7 @@ setup_radarr() {
       echo -e "${grn}Success!${endColor}"
       echo ''
       echo 'Saving the Radarr config to MediaButler...'
-      curl -s --location --request POST "${userMBURL}configure/radarr?" \
+      curl -s --location --request POST "${userMBURL}configure/${mbAPIEndpoint}?" \
       -H "Content-Type: application/x-www-form-urlencoded" \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -821,13 +898,14 @@ setup_radarr() {
       main_menu
     fi
   elif [ "${radarrMenuSelection}" = '2' ]; then
+    mbAPIEndpoint='radarr4k'
     echo 'Please enter your Radarr 4K URL (IE: http://127.0.0.1:8989/radarr/):'
     read -r providedURL
     echo ''
     echo 'Checking that the provided Radarr 4K URL is valid...'
     convert_url
     set +e
-    radarr4kURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    radarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
     set -e
     while [ "${radarr4kURLStatus}" = 'invalid' ]; do
       if [ "${radarr4kURLCheckResponse}" = '200' ]; then
@@ -843,21 +921,37 @@ setup_radarr() {
         echo 'Checking that the provided Radarr 4k URL is valid...'
         convert_url
         set +e
-        radarr4kURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        radarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
         set -e
       fi
     done
+    unset radarr4kAPIKey
     echo 'Please enter your Radarr 4K API key:'
-    read -r radarr4kAPIKey
+    while IFS= read -p "${prompt}" -r -s -n 1 char
+    do
+      if [[ "${char}" == $'\0' ]]; then
+        break
+      fi
+      prompt='*'
+      radarr4kAPIKey+="${char}"
+    done
     echo ''
     echo 'Testing that the provided Radarr 4K API Key is valid...'
     echo ''
     radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" |jq .[] |tr -d '"')
     while [ "${radarr4kAPIKeyStatus}" = 'invalid' ]; do
       if [ "${radarr4kAPITestResponse}" = 'Unauthorized' ]; then
-        echo -e "${red}Received something other than an OK response!${endColor}"
-        echo 'Please enter your Radarr 4K API Key:'
-        read -r radarr4kAPIKey
+        echo -e "${red}There was an error while attempting to validate the provided API key!${endColor}"
+        unset radarr4kAPIKey
+        echo 'Please enter your Radarr 4K API key:'
+        while IFS= read -p "${prompt}" -r -s -n 1 char
+        do
+          if [[ "${char}" == $'\0' ]]; then
+            break
+          fi
+          prompt='*'
+          radarr4kAPIKey+="${char}"
+        done
         echo ''
         radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" |jq .[] |tr -d '"')
       elif [ "${radarr4kAPITestResponse}" != 'Unauthorized' ]; then
@@ -873,7 +967,7 @@ setup_radarr() {
     create_arr_root_dirs_list
     prompt_for_arr_root_dir
     echo 'Testing the full Radarr 4K config for MediaButler...'
-    curl -s --location --request PUT "${userMBURL}configure/radarr4k?" \
+    curl -s --location --request PUT "${userMBURL}configure/${mbAPIEndpoint}?" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -883,7 +977,7 @@ setup_radarr() {
       echo -e "${grn}Success!${endColor}"
       echo ''
       echo 'Saving the Radarr 4K config to MediaButler...'
-      curl -s --location --request POST "${userMBURL}configure/radarr4k?" \
+      curl -s --location --request POST "${userMBURL}configure/${mbAPIEndpoint}?" \
       -H "Content-Type: application/x-www-form-urlencoded" \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -907,13 +1001,14 @@ setup_radarr() {
       main_menu
     fi
   elif [ "${radarrMenuSelection}" = '3' ]; then
+    mbAPIEndpoint='radarr3d'
     echo 'Please enter your Radarr 3D URL (IE: http://127.0.0.1:8989/radarr/):'
     read -r providedURL
     echo ''
     echo 'Checking that the provided Radarr 3D URL is valid...'
     convert_url
     set +e
-    radarr3dURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    radarr3dURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
     set -e
     while [ "${radarr3dURLStatus}" = 'invalid' ]; do
       if [ "${radarr3dURLCheckResponse}" = '200' ]; then
@@ -929,21 +1024,37 @@ setup_radarr() {
         echo 'Checking that the provided Radarr 4k URL is valid...'
         convert_url
         set +e
-        radarr3dURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        radarr3dURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
         set -e
       fi
     done
+    unset radarr3dAPIKey
     echo 'Please enter your Radarr 3D API key:'
-    read -r radarr3dAPIKey
+    while IFS= read -p "${prompt}" -r -s -n 1 char
+    do
+      if [[ "${char}" == $'\0' ]]; then
+        break
+      fi
+      prompt='*'
+      radarr3dAPIKey+="${char}"
+    done
     echo ''
     echo 'Testing that the provided Radarr 3D API Key is valid...'
     echo ''
     radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" |jq .[] |tr -d '"')
     while [ "${radarr3dAPIKeyStatus}" = 'invalid' ]; do
       if [ "${radarr3dAPITestResponse}" = 'Unauthorized' ]; then
-        echo -e "${red}Received something other than an OK response!${endColor}"
-        echo 'Please enter your Radarr 3D API Key:'
-        read -r radarr3dAPIKey
+        echo -e "${red}There was an error while attempting to validate the provided API key!${endColor}"
+        unset radarr3dAPIKey
+        echo 'Please enter your Radarr 3D API key:'
+        while IFS= read -p "${prompt}" -r -s -n 1 char
+        do
+          if [[ "${char}" == $'\0' ]]; then
+            break
+          fi
+          prompt='*'
+          radarr3dAPIKey+="${char}"
+        done
         echo ''
         radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" |jq .[] |tr -d '"')
       elif [ "${radarr3dAPITestResponse}" != 'Unauthorized' ]; then
@@ -959,7 +1070,7 @@ setup_radarr() {
     create_arr_root_dirs_list
     prompt_for_arr_root_dir
     echo 'Testing the full Radarr 3D config for MediaButler...'
-    curl -s --location --request PUT "${userMBURL}configure/radarr3d?" \
+    curl -s --location --request PUT "${userMBURL}configure/${mbAPIEndpoint}?" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -969,7 +1080,7 @@ setup_radarr() {
       echo -e "${grn}Success!${endColor}"
       echo ''
       echo 'Saving the Radarr 3D config to MediaButler...'
-      curl -s --location --request POST "${userMBURL}configure/radarr3d?" \
+      curl -s --location --request POST "${userMBURL}configure/${mbAPIEndpoint}?" \
       -H "Content-Type: application/x-www-form-urlencoded" \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -997,13 +1108,14 @@ setup_radarr() {
 
 # Function to process Tautulli configuration
 setup_tautulli() {
+  mbAPIEndpoint='tautulli'
   echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli/):'
   read -r providedURL
   echo ''
   echo 'Checking that the provided Tautulli URL is valid...'
   convert_url
   set +e
-  tautulliURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
+  tautulliURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
   set -e
   while [ "${tautulliURLStatus}" = 'invalid' ]; do
     if [ "${tautulliURLCheckResponse}" = '200' ]; then
@@ -1019,12 +1131,20 @@ setup_tautulli() {
       echo 'Checking that the provided Tautulli URL is valid...'
       convert_url
       set +e
-      tautulliURLCheckResponse=$(curl --head --write-out %{http_code} -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
+      tautulliURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
       set -e
     fi
   done
+  unset tautulliAPIKey
   echo 'Please enter your Tautulli API key:'
-  read -r tautulliAPIKey
+  while IFS= read -p "${prompt}" -r -s -n 1 char
+  do
+    if [[ "${char}" == $'\0' ]]; then
+      break
+    fi
+    prompt='*'
+    tautulliAPIKey+="${char}"
+  done
   echo ''
   echo 'Testing that the provided Tautulli API Key is valid...'
   echo ''
@@ -1036,15 +1156,23 @@ setup_tautulli() {
       echo -e "${grn}Success!${endColor}"
       echo ''
     elif [ "${tautulliAPITestResponse}" = 'Invalid apikey' ]; then
-      echo -e "${red}Received something other than an OK response!${endColor}"
-      echo 'Please enter your Tautulli API Key:'
-      read -r tautulliAPIKey
+      echo -e "${red}There was an error while attempting to validate the provided API key!${endColor}"
+      unset tautulliAPIKey
+      echo 'Please enter your Tautulli API key:'
+      while IFS= read -p "${prompt}" -r -s -n 1 char
+      do
+        if [[ "${char}" == $'\0' ]]; then
+          break
+        fi
+        prompt='*'
+        tautulliAPIKey+="${char}"
+      done
       echo ''
       tautulliAPITestResponse=$(curl -s "${convertedURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
     fi
   done
   echo 'Testing the full Tautulli config for MediaButler...'
-  curl -s --location --request PUT "${userMBURL}configure/tautulli?" \
+  curl -s --location --request PUT "${userMBURL}configure/${mbAPIEndpoint}?" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -H "${mbClientID}" \
   -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -1054,7 +1182,7 @@ setup_tautulli() {
     echo -e "${grn}Success!${endColor}"
     echo ''
     echo 'Saving the Tautulli config to MediaButler...'
-    curl -s --location --request POST "${userMBURL}configure/tautulli?" \
+    curl -s --location --request POST "${userMBURL}configure/${mbAPIEndpoint}?" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
