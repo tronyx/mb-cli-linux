@@ -298,10 +298,10 @@ get_plex_token() {
       -H "Content-Type: application/x-www-form-urlencoded; charset=utf-8" \
       --data-urlencode "user[password]=${plexPassword}" \
       --data-urlencode "user[login]=${plexUsername}" |jq .user.authToken |tr -d '"')
+    echo "${plexToken}" > "${plexTokenFile}"
   elif [ "${plexCredsOption}" == '2' ]; then
-    :
+    echo "${plexToken}" > "${plexTokenFile}"
   fi
-  echo "${plexToken}" > "${plexTokenFile}"
 }
 
 # Function to create list of Plex servers
@@ -355,8 +355,8 @@ prompt_for_plex_server() {
 
 # Function to exit the menu
 exit_menu() {
-  echo 'This will exit the program and any unfinished config setup will be lost.'
-  echo 'Are you sure you wish to exit?'
+  echo -e "${red}This will exit the program and any unfinished config setup will be lost.${endColor}"
+  echo -e "${ylw}Are you sure you wish to exit?${endColor}"
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o):"
   read -r exitPrompt
   if ! [[ "${exitPrompt}" =~ ^(yes|y|no|n)$ ]]; then
@@ -366,6 +366,16 @@ exit_menu() {
   elif [[ "${exitPrompt}" =~ ^(no|n)$ ]]; then
     main_menu
   fi
+}
+
+# Function to make sure provided URLs have a trailing slash
+convert_url() {
+  if [[ "${providedURL: -1}" = '/' ]]; then
+    convertedURL=$(echo "${providedURL}")
+  elif [[ "${providedURL: -1}" != '/' ]]; then
+    convertedURL=$(providedURL+=\/; echo "${providedURL}")
+  fi
+  JSONConvertedURL=$(echo "${providedURL}" |sed 's/:/%3A/g')
 }
 
 # Function to display the main menu
@@ -388,6 +398,20 @@ main_menu(){
   echo ''
   read -rp 'Selection: ' mainMenuSelection
   echo ''
+  if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5)$ ]]; then
+    echo -e "${red}You did not specify a valid option!${endColor}"
+    main_menu
+  elif [ "${mainMenuSelection}" = '1' ]; then
+    sonarr_menu
+  elif [ "${mainMenuSelection}" = '2' ]; then
+    radarr_menu
+  elif [ "${mainMenuSelection}" = '3' ]; then
+    setup_tautulli
+  elif [ "${mainMenuSelection}" = '4' ]; then
+    reset
+  elif [ "${mainMenuSelection}" = '5' ]; then
+    exit_menu
+  fi
 }
 
 # Function to display the Sonarr sub-menu
@@ -489,26 +513,30 @@ prompt_for_arr_root_dir() {
 setup_sonarr() {
   if [ "${sonarrMenuSelection}" = '1' ]; then
     echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
-    read -r sonarrURL
+    read -r providedURL
     echo ''
     echo 'Checking that the provided Sonarr URL is valid...'
-    if [[ "${sonarrURL: -1}" = '/' ]]; then
-      convertedSonarrURL=$(echo "${sonarrURL}")
-    elif [[ "${sonarrURL: -1}" != '/' ]]; then
-      convertedSonarrURL=$(sonarrURL+=\/; echo "${sonarrURL}")
-    fi
-    sonarrURLCheckResponse=$(curl -sI "${convertedSonarrURL}" |grep -vi mono |grep HTTP |awk '{print $2}')
+    #if [[ "${sonarrURL: -1}" = '/' ]]; then
+    #  convertedSonarrURL=$(echo "${sonarrURL}")
+    #elif [[ "${sonarrURL: -1}" != '/' ]]; then
+    #  convertedSonarrURL=$(sonarrURL+=\/; echo "${sonarrURL}")
+    #fi
+    convert_url
+    sonarrURLCheckResponse=$(curl -sI "${convertedURL}" |grep -vi mono |grep HTTP |awk '{print $2}')
     while [ "${sonarrURLStatus}" = 'invalid' ]; do
       if [ "${sonarrURLCheckResponse}" = '200' ]; then
         sed -i'' "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
         sonarrURLStatus='ok'
         echo -e "${grn}Success!${endColor}"
         echo ''
-      elif [ "${sonarrURLCheckResponse}" = '200' ]; then
+      elif [ "${sonarrURLCheckResponse}" != '200' ]; then
         echo -e "${red}Received something other than a 200 OK response!${endColor}"
         echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
-        read -r sonarrURL
+        read -r providedURL
         echo ''
+        echo 'Checking that the provided Sonarr URL is valid...'
+        convert_url
+        sonarrURLCheckResponse=$(curl -sI "${convertedURL}" |grep -vi mono |grep HTTP |awk '{print $2}')
       fi
     done
     echo 'Please enter your Sonarr API key:'
@@ -516,32 +544,33 @@ setup_sonarr() {
     echo ''
     echo 'Testing that the provided Sonarr API Key is valid...'
     echo ''
-    sonarrAPITestResponse=$(curl -s -X GET "${convertedSonarrURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
+    sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
     while [ "${sonarrAPIKeyStatus}" = 'invalid' ]; do
       if [ "${sonarrAPITestResponse}" = 'Unauthorized' ]; then
         echo -e "${red}Received something other than an OK response!${endColor}"
         echo 'Please enter your Sonarr API Key:'
         read -r sonarrAPIKey
         echo ''
+        sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
       elif [ "${sonarrAPITestResponse}" != 'Unauthorized' ]; then
         sed -i'' "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
         sonarrAPIKeyStatus='ok'
         echo -e "${grn}Success!${endColor}"
       fi
     done
-    curl -s -X GET "${convertedSonarrURL}api/profile" -H "X-Api-Key: ${sonarrAPIKey}" |jq . > "${rawArrProfilesFile}"
+    curl -s -X GET "${convertedURL}api/profile" -H "X-Api-Key: ${sonarrAPIKey}" |jq . > "${rawArrProfilesFile}"
     create_arr_profiles_list
     prompt_for_arr_profile
-    curl -s -X GET "${convertedSonarrURL}api/rootfolder" -H "X-Api-Key: ${sonarrAPIKey}" |jq . > "${rawArrRootDirsFile}"
+    curl -s -X GET "${convertedURL}api/rootfolder" -H "X-Api-Key: ${sonarrAPIKey}" |jq . > "${rawArrRootDirsFile}"
     create_arr_root_dirs_list
     prompt_for_arr_root_dir
     echo 'Testing the full Sonarr config for MediaButler...'
-    JSONConvertedSonarrURL=$(echo "${sonarrURL}" |sed 's/:/%3A/g')
+    #JSONConvertedSonarrURL=$(echo "${sonarrURL}" |sed 's/:/%3A/g')
     curl -s --location --request PUT "${userMBURL}configure/sonarr?" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
-    --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${sonarrConfigFile}"
+    --data "url=${JSONConvertedURL}&apikey=${sonarrAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${sonarrConfigFile}"
     sonarrMBConfigTestResponse=$(cat "${sonarrConfigFile}" |jq .message |tr -d '"')
     if [ "${sonarrMBConfigTestResponse}" = 'success' ]; then
       echo -e "${grn}Success!${endColor}"
@@ -551,12 +580,13 @@ setup_sonarr() {
       -H "Content-Type: application/x-www-form-urlencoded" \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
-      --data "url=${JSONConvertedSonarrURL}&apikey=${sonarrAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${sonarrConfigFile}"
+      --data "url=${JSONConvertedURL}&apikey=${sonarrAPIKey}&defaultProfile=${selectedArrProfile}&defaultRoot=${selectedArrRootDir}" |jq . > "${sonarrConfigFile}"
       sonarrMBConfigPostResponse=$(cat "${sonarrConfigFile}" |jq .message |tr -d '"')
       if [ "${sonarrMBConfigPostResponse}" = 'success' ]; then
         echo -e "${grn}Done! Sonarr has been successfully configured for${endColor}"
         echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
         sleep 3
+        echo ''
         echo 'Returning you to the Main Menu...'
         main_menu
       elif [ "${sonarrMBConfigPostResponse}" != 'success' ]; then
@@ -588,26 +618,30 @@ setup_radarr() {
 # Function to process Tautulli configuration
 setup_tautulli() {
   echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli/):'
-  read -r tautulliURL
+  read -r providedURL
   echo ''
   echo 'Checking that the provided Tautulli URL is valid...'
-  if [[ "${tautulliURL: -1}" = '/' ]]; then
-    convertedTautulliURL=$(echo "${tautulliURL}")
-  elif [[ "${tautulliURL: -1}" != '/' ]]; then
-    convertedTautulliURL=$(tautulliURL+=\/; echo "${tautulliURL}")
-  fi
-  tautulliURLCheckResponse=$(curl -sI "${convertedTautulliURL}"auth/login |grep HTTP |awk '{print $2}')
+  #if [[ "${tautulliURL: -1}" = '/' ]]; then
+  #  convertedTautulliURL=$(echo "${tautulliURL}")
+  #elif [[ "${tautulliURL: -1}" != '/' ]]; then
+  #  convertedTautulliURL=$(tautulliURL+=\/; echo "${tautulliURL}")
+  #fi
+  convert_url
+  tautulliURLCheckResponse=$(curl -sI "${convertedURL}"auth/login |grep HTTP |awk '{print $2}')
   while [ "${tautulliURLStatus}" = 'invalid' ]; do
     if [ "${tautulliURLCheckResponse}" = '200' ]; then
       sed -i'' "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='ok'/" "${scriptname}"
       tautulliURLStatus='ok'
       echo -e "${grn}Success!${endColor}"
       echo ''
-    elif [ "${tautulliURLCheckResponse}" = '200' ]; then
+    elif [ "${tautulliURLCheckResponse}" != '200' ]; then
       echo -e "${red}Received something other than a 200 OK response!${endColor}"
       echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli/):'
-      read -r tautulliURL
+      read -r providedURL
       echo ''
+      echo 'Checking that the provided Tautulli URL is valid...'
+      convert_url
+      tautulliURLCheckResponse=$(curl -sI "${convertedURL}"auth/login |grep HTTP |awk '{print $2}')
     fi
   done
   echo 'Please enter your Tautulli API key:'
@@ -615,7 +649,7 @@ setup_tautulli() {
   echo ''
   echo 'Testing that the provided Tautulli API Key is valid...'
   echo ''
-  tautulliAPITestResponse=$(curl -s "${convertedTautulliURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
+  tautulliAPITestResponse=$(curl -s "${convertedURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
   while [ "${tautulliAPIKeyStatus}" = 'invalid' ]; do
     if [ "${tautulliAPITestResponse}" = 'null' ]; then
       sed -i'' "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='ok'/" "${scriptname}"
@@ -627,15 +661,16 @@ setup_tautulli() {
       echo 'Please enter your Tautulli API Key:'
       read -r tautulliAPIKey
       echo ''
+      tautulliAPITestResponse=$(curl -s "${convertedURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
     fi
   done
   echo 'Testing the full Tautulli config for MediaButler...'
-  JSONConvertedTautulliURL=$(echo "${tautulliURL}" |sed 's/:/%3A/g')
+  #JSONConvertedTautulliURL=$(echo "${tautulliURL}" |sed 's/:/%3A/g')
   curl -s --location --request PUT "${userMBURL}configure/tautulli?" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -H "${mbClientID}" \
   -H "Authorization: Bearer ${plexServerMBToken}" \
-  --data "url=${JSONConvertedTautulliURL}&apikey=${tautulliAPIKey}" |jq . > "${tautulliConfigFile}"
+  --data "url=${JSONConvertedURL}&apikey=${tautulliAPIKey}" |jq . > "${tautulliConfigFile}"
   tautulliMBConfigTestResponse=$(cat "${tautulliConfigFile}" |jq .message |tr -d '"')
   if [ "${tautulliMBConfigTestResponse}" = 'success' ]; then
     echo -e "${grn}Success!${endColor}"
@@ -645,12 +680,13 @@ setup_tautulli() {
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
-    --data "url=${JSONConvertedTautulliURL}&apikey=${tautulliAPIKey}" |jq . > "${tautulliConfigFile}"
+    --data "url=${JSONConvertedURL}&apikey=${tautulliAPIKey}" |jq . > "${tautulliConfigFile}"
     tautulliMBConfigPostResponse=$(cat "${tautulliConfigFile}" |jq .message |tr -d '"')
     if [ "${tautulliMBConfigPostResponse}" = 'success' ]; then
       echo -e "${grn}Done! Tautulli has been successfully configured for${endColor}"
       echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
       sleep 3
+      echo ''
       echo 'Returning you to the Main Menu...'
       main_menu
     elif [ "${tautulliMBConfigPostResponse}" != 'success' ]; then
@@ -691,20 +727,20 @@ main() {
     prompt_for_plex_server
   fi
   main_menu
-  if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5)$ ]]; then
-    echo -e "${red}You did not specify a valid option!${endColor}"
-    main_menu
-  elif [ "${mainMenuSelection}" = '1' ]; then
-    sonarr_menu
-  elif [ "${mainMenuSelection}" = '2' ]; then
-    radarr_menu
-  elif [ "${mainMenuSelection}" = '3' ]; then
-    setup_tautulli
-  elif [ "${mainMenuSelection}" = '4' ]; then
-    reset
-  elif [ "${mainMenuSelection}" = '5' ]; then
-    exit_menu
-  fi
+  #if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5)$ ]]; then
+  #  echo -e "${red}You did not specify a valid option!${endColor}"
+  #  main_menu
+  #elif [ "${mainMenuSelection}" = '1' ]; then
+  #  sonarr_menu
+  #elif [ "${mainMenuSelection}" = '2' ]; then
+  #  radarr_menu
+  #elif [ "${mainMenuSelection}" = '3' ]; then
+  #  setup_tautulli
+  #elif [ "${mainMenuSelection}" = '4' ]; then
+  #  reset
+  #elif [ "${mainMenuSelection}" = '5' ]; then
+  #  exit_menu
+  #fi
 }
 
 main
