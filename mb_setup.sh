@@ -248,11 +248,11 @@ reset(){
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
   elif [[ "${resetConfirmation}" =~ ^(yes|y)$ ]]; then
     cleanup
-    sed -i "" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='invalid'/" "${scriptname}"
-    sed -i "" "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='invalid'/" "${scriptname}"
-    sed -i "" "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
-    sed -i "" "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
-    sed -i "" "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
+    sed -i"" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='invalid'/" "${scriptname}"
+    sed -i"" "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='invalid'/" "${scriptname}"
+    sed -i"" "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
+    sed -i"" "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
+    sed -i"" "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
     main_menu
   elif [[ "${resetConfirmation}" =~ ^(no|n)$ ]]; then
     main_menu
@@ -313,7 +313,7 @@ check_plex_creds() {
         echo 'Please enter your Plex password:'
         read -rs plexPassword
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
-        sed -i "" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+        sed -i"" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
         plexCredsStatus='ok'
         echo -e "${grn}Success!${endColor}"
         echo ''
@@ -330,7 +330,7 @@ check_plex_creds() {
         echo 'Please enter your Plex token:'
         read -rs plexToken
       elif [[ "${authResponse}" != *'BadRequest'* ]]; then
-        sed -i "" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+        sed -i"" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
         plexCredsStatus='ok'
       fi
     fi
@@ -567,12 +567,12 @@ setup_sonarr() {
     set -e
     while [ "${sonarrURLStatus}" = 'invalid' ]; do
       if [ "${sonarrURLCheckResponse}" = '200' ]; then
-        sed -i "" "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
+        sed -i"" "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
         sonarrURLStatus='ok'
         echo -e "${grn}Success!${endColor}"
         echo ''
       elif [ "${sonarrURLCheckResponse}" != '200' ]; then
-        echo -e "${red}Received something other than a 200 OK response!${endColor}"
+        echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
         echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
         read -r providedURL
         echo ''
@@ -597,7 +597,7 @@ setup_sonarr() {
         echo ''
         sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
       elif [ "${sonarrAPITestResponse}" != 'Unauthorized' ]; then
-        sed -i "" "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
+        sed -i"" "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
         sonarrAPIKeyStatus='ok'
         echo -e "${grn}Success!${endColor}"
       fi
@@ -670,12 +670,12 @@ setup_tautulli() {
   set -e
   while [ "${tautulliURLStatus}" = 'invalid' ]; do
     if [ "${tautulliURLCheckResponse}" = '200' ]; then
-      sed -i "" "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='ok'/" "${scriptname}"
+      sed -i"" "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='ok'/" "${scriptname}"
       tautulliURLStatus='ok'
       echo -e "${grn}Success!${endColor}"
       echo ''
     elif [ "${tautulliURLCheckResponse}" != '200' ]; then
-      echo -e "${red}Received something other than a 200 OK response!${endColor}"
+      echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
       echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli/):'
       read -r providedURL
       echo ''
@@ -694,7 +694,7 @@ setup_tautulli() {
   tautulliAPITestResponse=$(curl -s "${convertedURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
   while [ "${tautulliAPIKeyStatus}" = 'invalid' ]; do
     if [ "${tautulliAPITestResponse}" = 'null' ]; then
-      sed -i "" "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='ok'/" "${scriptname}"
+      sed -i"" "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='ok'/" "${scriptname}"
       tautulliAPIKeyStatus='ok'
       echo -e "${grn}Success!${endColor}"
       echo ''
@@ -747,25 +747,25 @@ main() {
   checks
   create_dir
   get_line_numbers
-  #if [[ -e "${plexCredsFile}" ]]; then
-  #  sed -i "" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
-  #elif [[ ! -f "${plexCredsFile}" ]]; then
+  if [[ -e "${plexCredsFile}" ]]; then
+    sed -i"" "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+  elif [[ ! -f "${plexCredsFile}" ]]; then
     get_plex_creds
     check_plex_creds
-  #fi
-  #if [[ -e "${plexTokenFile}" ]]; then
-  #  plexToken=$(cat "${plexTokenFile}")
-  #elif [[ ! -f "${plexTokenFile}" ]]; then
+  fi
+  if [[ -e "${plexTokenFile}" ]]; then
+    plexToken=$(cat "${plexTokenFile}")
+  elif [[ ! -f "${plexTokenFile}" ]]; then
     get_plex_token
-  #fi
-  #if [[ -e "${plexServersFile}" ]]; then
-  #  plexServerMachineID=$(cat "${plexServerMachineIDFile}")
-  #  userMBURL=$(cat "${userMBURLFile}")
-  #  plexServerMBToken=$(cat "${plexServerMBTokenFile}")
-  #elif [[ ! -f "${plexServersFile}" ]]; then
+  fi
+  if [[ -e "${plexServersFile}" ]]; then
+    plexServerMachineID=$(cat "${plexServerMachineIDFile}")
+    userMBURL=$(cat "${userMBURLFile}")
+    plexServerMBToken=$(cat "${plexServerMBTokenFile}")
+  elif [[ ! -f "${plexServersFile}" ]]; then
     create_plex_servers_list
     prompt_for_plex_server
-  #fi
+  fi
   main_menu
 }
 
