@@ -206,8 +206,9 @@ create_dir() {
 
 # Cleanup temp files
 cleanup() {
-  rm -rf "${tempDir}"*.txt || true
-  rm -rf "${scriptname}".bak || true
+  rm -rf "${tempDir}" || true
+  rm -rf "${scriptname}".* || true
+  rm -rf "${jsonEnvFile}" || true
 }
 
 # Exit the script if the user hits CTRL+C
@@ -251,7 +252,7 @@ reset(){
     sed -i.bak "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
     sed -i.bak "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
     sed -i.bak "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
-    main_menu
+    exit 0
   elif [[ "${resetConfirmation}" =~ ^(no|n)$ ]]; then
     main_menu
   fi
@@ -271,17 +272,8 @@ get_plex_creds() {
     echo 'Please enter your Plex username:'
     read -r plexUsername
     echo ''
-    unset plexPassword
     echo 'Please enter your Plex password:'
-    while IFS= read -p "${prompt}" -r -s -n 1 char
-    do
-      if [[ "${char}" == $'\0' ]]; then
-        break
-      fi
-      prompt='*'
-      plexPassword+="${char}"
-    done
-    echo ''
+    read -rs plexPassword
     echo ''
   elif [ "${plexCredsOption}" == '2' ]; then
     echo 'Please enter your Plex token:'
@@ -378,7 +370,7 @@ prompt_for_plex_server() {
   read -p "Server: " plexServerSelection
   if [[ "${plexServerSelection}" -lt '1' ]] || [[ "${plexServerSelection}" -gt "${numberOfOptions}" ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
-    prompt_for_plex_server
+    exit 1
   else
     :
   fi
@@ -590,8 +582,13 @@ prompt_for_arr_profile() {
   echo ''
   read -p "Profile (1-${numberOfOptions}): " arrProfilesSelection
   echo ''
-  arrProfilesArrayElement=$((${arrProfilesSelection}-1))
-  selectedArrProfile=$(jq .["${arrProfilesArrayElement}"].name "${rawArrProfilesFile}" |tr -d '"')
+  if [[ "${arrProfilesSelection}" -lt '1' ]] || [[ "${arrProfilesSelection}" -gt "${numberOfOptions}" ]]; then
+    echo -e "${red}You didn't not specify a valid option!${endColor}"
+    exit 1
+  else
+    arrProfilesArrayElement=$((${arrProfilesSelection}-1))
+    selectedArrProfile=$(jq .["${arrProfilesArrayElement}"].name "${rawArrProfilesFile}" |tr -d '"')
+  fi
 }
 
 # Function to create list of Sonarr/Radarr root directories
@@ -614,8 +611,13 @@ prompt_for_arr_root_dir() {
   echo ''
   read -p "Root Dir (1-${numberOfOptions}): " arrRootDirsSelection
   echo ''
-  arrRootDirsArrayElement=$((${arrRootDirsSelection}-1))
-  selectedArrRootDir=$(jq .["${arrRootDirsArrayElement}"].path "${rawArrRootDirsFile}" |tr -d '"')
+  if [[ "${arrRootDirsSelection}" -lt '1' ]] || [[ "${arrRootDirsSelection}" -gt "${numberOfOptions}" ]]; then
+    echo -e "${red}You didn't not specify a valid option!${endColor}"
+    exit 1
+  else
+    arrRootDirsArrayElement=$((${arrRootDirsSelection}-1))
+    selectedArrRootDir=$(jq .["${arrRootDirsArrayElement}"].path "${rawArrRootDirsFile}" |tr -d '"')
+  fi
 }
 
 # Function to process Sonarr configuration
