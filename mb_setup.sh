@@ -1339,7 +1339,7 @@ setup_tautulli() {
         sed -i.bak "${tautulliAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
         tautulliAPIKeyStatus='invalid'
       elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
-        tautulli_menu
+        main_menu
       fi
     elif [ "${tautulliSetupCheck}" = '{}' ]; then
       :
