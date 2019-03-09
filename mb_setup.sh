@@ -12,6 +12,8 @@ mbClientID='MB-Client-Identifier: 4d656446-fbe7-4545-b754-1adfb8eb554e'
 mbClientIDShort='4d656446-fbe7-4545-b754-1adfb8eb554e'
 # Set initial Plex credentials status
 plexCredsStatus='invalid'
+# Set initial Plex server selection status
+plexServerStatus='invalid'
 # Set initial Tautulli credentials status
 tautulliURLStatus='invalid'
 tautulliAPIKeyStatus='invalid'
@@ -213,6 +215,7 @@ cleanup() {
 
 # Exit the script if the user hits CTRL+C
 function control_c() {
+  #cleanup
   exit
 }
 trap 'control_c' 2
@@ -220,6 +223,7 @@ trap 'control_c' 2
 # Grab status variable line numbers
 get_line_numbers() {
   plexCredsStatusLineNum=$(head -50 "${scriptname}" |grep -En -A1 'Set initial Plex credentials status' |tail -1 | awk -F- '{print $1}')
+  plexServerStatusLineNum=$(head -50 "${scriptname}" |grep -En -A1 'Set initial Plex server selection status' |tail -1 | awk -F- '{print $1}')
   tautulliURLStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Tautulli credentials status' |grep URL |awk -F- '{print $1}')
   tautulliAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Tautulli credentials status' |grep API |awk -F- '{print $1}')
   sonarrURLStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Sonarr credentials status' |grep URL |awk -F- '{print $1}')
@@ -234,8 +238,55 @@ get_line_numbers() {
   radarr3dAPIKeyStatusLineNum=$(head -50 "${scriptname}" |grep -En -A2 'Set initial Radarr 3D credentials status' |grep API |awk -F- '{print $1}')
 }
 
-# Function to reset the utility
-# This will remove all saved text files and reset the check statuses to invalid
+# Functions to reset the config status for the applications
+# Plex
+reset_plex() {
+  sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='invalid'/" "${scriptname}"
+  plexCredsStatus='invalid'
+  sed -i.bak "${plexServerStatusLineNum} s/plexServerStatus='[^']*'/plexServerStatus='invalid'/" "${scriptname}"
+  plexServerStatus='invalid'
+}
+# Sonarr
+reset_sonarr() {
+  sed -i.bak "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='invalid'/" "${scriptname}"
+  sonarrURLStatus='invalid'
+  sed -i.bak "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
+  sonarrAPIKeyStatus='invalid'
+}
+# Sonarr 4K
+reset_sonarr4k() {
+  sed -i.bak "${sonarr4kURLStatusLineNum} s/sonarr4kURLStatus='[^']*'/sonarr4kURLStatus='invalid'/" "${scriptname}"
+  sonarr4kURLStatus='invalid'
+  sed -i.bak "${sonarr4kAPIKeyStatusLineNum} s/sonarr4kAPIKeyStatus='[^']*'/sonarr4kAPIKeyStatus='invalid'/" "${scriptname}"
+  sonarr4kAPIKeyStatus='invalid'
+}
+# Radarr
+reset_radarr() {
+  sed -i.bak "${radarrURLStatusLineNum} s/radarrURLStatus='[^']*'/radarrURLStatus='invalid'/" "${scriptname}"
+  radarrURLStatus='invalid'
+  sed -i.bak "${radarrAPIKeyStatusLineNum} s/radarrAPIKeyStatus='[^']*'/radarrAPIKeyStatus='invalid'/" "${scriptname}"
+  radarrAPIKeyStatus='invalid'
+}
+# Radarr 4K
+reset_radarr4k() {
+  sed -i.bak "${radarr4kURLStatusLineNum} s/radarr4kURLStatus='[^']*'/radarr4kURLStatus='invalid'/" "${scriptname}"
+  radarr4kURLStatus='invalid'
+  sed -i.bak "${radarr4kAPIKeyStatusLineNum} s/radarr4kAPIKeyStatus='[^']*'/radarr4kAPIKeyStatus='invalid'/" "${scriptname}"
+  radarr4kAPIKeyStatus='invalid'
+}
+# Radarr 3D
+reset_radarr3d() {
+  sed -i.bak "${radarr3dURLStatusLineNum} s/radarr3dURLStatus='[^']*'/radarr3dURLStatus='invalid'/" "${scriptname}"
+  radarr3dURLStatus='invalid'
+  sed -i.bak "${radarr3dAPIKeyStatusLineNum} s/radarr3dAPIKeyStatus='[^']*'/radarr3dAPIKeyStatus='invalid'/" "${scriptname}"
+  radarr3dAPIKeyStatus='invalid'
+}
+# Tautulli
+reset_tautulli() {
+  sed -i.bak "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
+  sed -i.bak "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
+}
+# All apps and Plex
 reset(){
   echo -e "${red}**WARNING!!!** This will reset ALL setup progress!${endColor}"
   echo -e "${ylw}Do you wish to continue?${endColor}"
@@ -246,12 +297,14 @@ reset(){
   if ! [[ "${resetConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
   elif [[ "${resetConfirmation}" =~ ^(yes|y)$ ]]; then
+    reset_plex
+    reset_sonarr
+    reset_sonarr4k
+    reset_radarr
+    reset_radarr4k
+    reset_radar3d
+    reset_tautulli
     cleanup
-    sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='invalid'/" "${scriptname}"
-    sed -i.bak "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='invalid'/" "${scriptname}"
-    sed -i.bak "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='invalid'/" "${scriptname}"
-    sed -i.bak "${tautulliURLStatusLineNum} s/tautulliURLStatus='[^']*'/tautulliURLStatus='invalid'/" "${scriptname}"
-    sed -i.bak "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
     exit 0
   elif [[ "${resetConfirmation}" =~ ^(no|n)$ ]]; then
     main_menu
@@ -281,6 +334,7 @@ get_plex_creds() {
     echo ''
   else
     echo 'You provided an invalid option, please try again.'
+    reset_plex
     exit 1
   fi
 }
@@ -363,17 +417,20 @@ create_plex_servers_list() {
 # Function to prompt user to select Plex Server from list and retrieve user's MediaButler URL
 prompt_for_plex_server() {
   numberOfOptions=$(echo "${#plexServers[@]}")
-  echo 'Please choose which Plex Server you would like to setup MediaButler for:'
-  echo ''
-  cat "${numberedPlexServersFile}"
-  echo ''
-  read -p "Server: " plexServerSelection
-  if [[ "${plexServerSelection}" -lt '1' ]] || [[ "${plexServerSelection}" -gt "${numberOfOptions}" ]]; then
-    echo -e "${red}You did not specify a valid option!${endColor}"
-    exit 1
-  else
-    :
-  fi
+  while [ "${plexServerStatus}" = 'invalid' ]; do
+    echo 'Please choose which Plex Server you would like to setup MediaButler for:'
+    echo ''
+    cat "${numberedPlexServersFile}"
+    echo ''
+    read -p "Server: " plexServerSelection
+    if [[ "${plexServerSelection}" -lt '1' ]] || [[ "${plexServerSelection}" -gt "${numberOfOptions}" ]]; then
+      echo -e "${red}You did not specify a valid option!${endColor}"
+      #reset_plex
+    else
+      sed -i.bak "${plexServerStatusLineNum} s/plexServerStatus='[^']*'/plexServerStatus='ok'/" "${scriptname}"
+      plexServerStatus='ok'
+    fi
+  done
   echo ''
   echo 'Gathering required information...'
   plexServerArrayElement=$((${plexServerSelection}-1))
@@ -584,7 +641,23 @@ prompt_for_arr_profile() {
   echo ''
   if [[ "${arrProfilesSelection}" -lt '1' ]] || [[ "${arrProfilesSelection}" -gt "${numberOfOptions}" ]]; then
     echo -e "${red}You didn't not specify a valid option!${endColor}"
-    exit 1
+    echo ''
+    if [ "${endpoint}" = 'sonarr' ]; then
+      reset_sonarr
+      sonarr_menu
+    elif [ "${endpoint}" = 'sonarr4k' ]; then
+      reset_sonarr4k
+      sonarr_menu
+    elif [ "${endpoint}" = 'radarr' ]; then
+      reset_radarr
+      radarr_menu
+    elif [ "${endpoint}" = 'radarr4k' ]; then
+      reset_radarr4k
+      radarr_menu
+    elif [ "${endpoint}" = 'radarr3d' ]; then
+      reset_radar3d
+      radarr_menu
+    fi
   else
     arrProfilesArrayElement=$((${arrProfilesSelection}-1))
     selectedArrProfile=$(jq .["${arrProfilesArrayElement}"].name "${rawArrProfilesFile}" |tr -d '"')
@@ -613,7 +686,23 @@ prompt_for_arr_root_dir() {
   echo ''
   if [[ "${arrRootDirsSelection}" -lt '1' ]] || [[ "${arrRootDirsSelection}" -gt "${numberOfOptions}" ]]; then
     echo -e "${red}You didn't not specify a valid option!${endColor}"
-    exit 1
+    echo ''
+    if [ "${endpoint}" = 'sonarr' ]; then
+      reset_sonarr
+      sonarr_menu
+    elif [ "${endpoint}" = 'sonarr4k' ]; then
+      reset_sonarr4k
+      sonarr_menu
+    elif [ "${endpoint}" = 'radarr' ]; then
+      reset_radarr
+      radarr_menu
+    elif [ "${endpoint}" = 'radarr4k' ]; then
+      reset_radarr4k
+      radarr_menu
+    elif [ "${endpoint}" = 'radarr3d' ]; then
+      reset_radar3d
+      radarr_menu
+    fi
   else
     arrRootDirsArrayElement=$((${arrRootDirsSelection}-1))
     selectedArrRootDir=$(jq .["${arrRootDirsArrayElement}"].path "${rawArrRootDirsFile}" |tr -d '"')
