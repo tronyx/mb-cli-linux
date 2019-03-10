@@ -587,7 +587,11 @@ main_menu(){
   echo ''
   echo '1) Sonarr'
   echo '2) Radarr'
-  echo '3) Tautulli'
+  if [[ "${tautulliURLStatus}" = 'ok' ]] && [[ "${tautulliAPIKeyStatus}" = 'ok' ]]; then
+    echo -e "3) ${grn}Tautulli${endColor}"
+  else
+    echo -e "3) ${red}Tautulli${endColor}"
+  fi
   echo '4) Reset'
   echo '5) Exit'
   echo ''
