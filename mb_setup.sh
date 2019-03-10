@@ -312,9 +312,9 @@ reset(){
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r resetConfirmation
   echo ''
-  if ! [[ "${resetConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
+  if ! [[ "${resetConfirmation}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-  elif [[ "${resetConfirmation}" =~ ^(yes|y)$ ]]; then
+  elif [[ "${resetConfirmation}" =~ ^(yes|y|Yes|Y)$ ]]; then
     reset_plex
     reset_sonarr
     reset_sonarr4k
@@ -324,7 +324,7 @@ reset(){
     reset_tautulli
     cleanup
     exit 0
-  elif [[ "${resetConfirmation}" =~ ^(no|n)$ ]]; then
+  elif [[ "${resetConfirmation}" =~ ^(no|n|No|N)$ ]]; then
     main_menu
   fi
 }
@@ -472,28 +472,36 @@ prompt_for_plex_server() {
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r mbURLConfirmation
   echo ''
-  if ! [[ "${mbURLConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
+  if ! [[ "${mbURLConfirmation}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-  elif [[ "${mbURLConfirmation}" =~ ^(yes|y)$ ]]; then
+  elif [[ "${mbURLConfirmation}" =~ ^(yes|y|Yes|Y)$ ]]; then
     :
-  elif [[ "${mbURLConfirmation}" =~ ^(no|n)$ ]]; then
+  elif [[ "${mbURLConfirmation}" =~ ^(no|n|No|N)$ ]]; then
+    echo 'Please enter the correct MediaButler URL:'
+    read -r providedURL
+    echo ''
+    echo 'Checking that the provided MediaButler URL is valid...'
+    echo ''
+    convert_url
+    set +e
+    mbURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    userMBApiVersionOne=$(curl -s https://tronflix.app/mediabutler/version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $1}')
+    userMBApiVersionTwo=$(curl -s https://tronflix.app/mediabutler/version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $2}')
+    userMBApiVersionThree=$(curl -s https://tronflix.app/mediabutler/version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $3}')
+    set -e
+    if [[ "${userMBApiVersionOne}" -ge '1' ]] && [[ "${userMBApiVersionTwo}" -ge '1' ]] && [[ "${userMBApiVersionThree}" -ge '12' ]]; then
+      mbAPIStatus='ok'
+    else
+      mbAPIStatus='bad'
+    fi
     while [ "${mbURLStatus}" = 'invalid' ]; do
-      echo 'Please enter the correct MediaButler URL:'
-      read -r providedURL
-      echo ''
-      echo 'Checking that the provided MediaButler URL is valid...'
-      echo ''
-      convert_url
-      set +e
-      mbURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
-      set -e
-      if [ "${sonarrURLCheckResponse}" = '200' ]; then
-        sed -i.bak "${plexServerStatusLineNum} s/plexServerStatus='[^']*'/plexServerStatus='ok'/" "${scriptname}"
-        plexServerStatus='ok'
+      if [[ "${mbURLCheckResponse}" = '200' ]] && [[ "${mbAPIStatus}" = 'ok' ]]; then
+        sed -i.bak "${mbURLStatusLineNum} s/mbURLStatus='[^']*'/mbURLStatus='ok'/" "${scriptname}"
+        mbURLStatus='ok'
         userMBURL=$(echo "${convertedURL}")
         echo -e "${grn}Success!${endColor}"
         echo ''
-      elif [ "${mbURLCheckResponse}" != '200' ]; then
+      elif [[ "${mbURLCheckResponse}" != '200' ]] || [[ "${mbAPIStatus}" = 'bad' ]]; then
         echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
         echo 'Please enter the correct MediaButler URL:'
         read -r providedURL
@@ -507,10 +515,6 @@ prompt_for_plex_server() {
       fi
     done
   fi
-  #echo "${selectedPlexServerName}" > "${selectedPlexServerNameFile}"
-  #echo "${plexServerMachineID}" > "${plexServerMachineIDFile}"
-  #echo "${userMBURL}" > "${userMBURLFile}"
-  #echo "${plexServerMBToken}" > "${plexServerMBTokenFile}"
 }
 
 # Function to create environment variables file
@@ -549,11 +553,11 @@ exit_menu() {
   echo -e "${ylw}Are you sure you wish to exit?${endColor}"
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r exitPrompt
-  if ! [[ "${exitPrompt}" =~ ^(yes|y|no|n)$ ]]; then
+  if ! [[ "${exitPrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-  elif [[ "${exitPrompt}" =~ ^(yes|y)$ ]]; then
+  elif [[ "${exitPrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
     exit 0
-  elif [[ "${exitPrompt}" =~ ^(no|n)$ ]]; then
+  elif [[ "${exitPrompt}" =~ ^(no|n|No|N)$ ]]; then
     main_menu
   fi
 }
@@ -773,14 +777,14 @@ setup_sonarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
           sed -i.bak "${sonarrURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           sonarrURLStatus='invalid'
           sed -i.bak "${sonarrAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           sonarrAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
           sonarr_menu
         fi
       elif [ "${sonarrSetupCheck}" = '{}' ]; then
@@ -815,14 +819,15 @@ setup_sonarr() {
     convert_url
     set +e
     sonarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    sonarrURLAppCheckResponse=$(curl -s http://192.168.1.103:9898/sonarr/ |grep '<title>' |awk '{print $1}' |cut -c8-13)
     set -e
     while [ "${sonarrURLStatus}" = 'invalid' ]; do
-      if [ "${sonarrURLCheckResponse}" = '200' ]; then
+      if [[ "${sonarrURLCheckResponse}" = '200' ]] && [[ "${sonarrURLAppCheckResponse}" = 'Sonarr' ]]; then
         sed -i.bak "${sonarrURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         sonarrURLStatus='ok'
         echo -e "${grn}Success!${endColor}"
         echo ''
-      elif [ "${sonarrURLCheckResponse}" != '200' ]; then
+      elif [[ "${sonarrURLCheckResponse}" != '200' ]] || [[ "${sonarrURLAppCheckResponse}" != 'Sonarr' ]]; then
         echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
         echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
         read -r providedURL
@@ -832,6 +837,7 @@ setup_sonarr() {
         convert_url
         set +e
         sonarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        sonarrURLAppCheckResponse=$(curl -s "${convertedURL}" |grep '<title>' |awk '{print $1}' |cut -c8-13)
         set -e
       fi
     done
@@ -906,14 +912,14 @@ setup_sonarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
           sed -i.bak "${sonarr4kURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           sonarr4kURLStatus='invalid'
           sed -i.bak "${sonarr4kAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           sonarr4kAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
           sonarr_menu
         fi
       elif [ "${sonarr4kSetupCheck}" = '{}' ]; then
@@ -930,14 +936,15 @@ setup_sonarr() {
     convert_url
     set +e
     sonarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    sonarr4kURLAppCheckResponse=$(curl -s "${convertedURL}" |grep '<title>' |awk '{print $1}' |cut -c8-13)
     set -e
     while [ "${sonarr4kURLStatus}" = 'invalid' ]; do
-      if [ "${sonarr4kURLCheckResponse}" = '200' ]; then
+      if [[ "${sonarr4kURLCheckResponse}" = '200' ]] && [[ "${sonarr4kURLAppCheckResponse}" = 'Sonarr' ]]; then
         sed -i.bak "${sonarr4kURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         sonarr4kURLStatus='ok'
         echo -e "${grn}Success!${endColor}"
         echo ''
-      elif [ "${sonarr4kURLCheckResponse}" != '200' ]; then
+      elif [[ "${sonarr4kURLCheckResponse}" != '200' ]] || [[ "${sonarr4kURLAppCheckResponse}" != 'Sonarr' ]]; then
         echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
         echo 'Please enter your Sonarr 4k URL (IE: http://127.0.0.1:8989/sonarr/):'
         read -r providedURL
@@ -947,6 +954,7 @@ setup_sonarr() {
         convert_url
         set +e
         sonarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        sonarr4kURLAppCheckResponse=$(curl -s "${convertedURL}" |grep '<title>' |awk '{print $1}' |cut -c8-13)
         set -e
       fi
     done
@@ -1026,14 +1034,14 @@ setup_radarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
           sed -i.bak "${radarrURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           radarrURLStatus='invalid'
           sed -i.bak "${radarrAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           radarrAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
           radarr_menu
         fi
       elif [ "${radarrSetupCheck}" = '{}' ]; then
@@ -1050,14 +1058,15 @@ setup_radarr() {
     convert_url
     set +e
     radarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    radarrURLAppCheckResponse=$(curl -s "${convertedURL}" |grep '<title>' |awk '{print $1}' |cut -c8-13)
     set -e
     while [ "${radarrURLStatus}" = 'invalid' ]; do
-      if [ "${radarrURLCheckResponse}" = '200' ]; then
+      if [[ "${radarrURLCheckResponse}" = '200' ]] && [[ "${radarrURLAppCheckResponse}" = 'Radarr' ]]; then
         sed -i.bak "${radarrURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         radarrURLStatus='ok'
         echo -e "${grn}Success!${endColor}"
         echo ''
-      elif [ "${radarrURLCheckResponse}" != '200' ]; then
+      elif [[ "${radarrURLCheckResponse}" != '200' ]] || [[ "${radarrURLAppCheckResponse}" != 'Radarr' ]]; then
         echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
         echo 'Please enter your Radarr URL (IE: http://127.0.0.1:8989/radarr/):'
         read -r providedURL
@@ -1067,6 +1076,7 @@ setup_radarr() {
         convert_url
         set +e
         radarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        radarrURLAppCheckResponse=$(curl -s "${convertedURL}" |grep '<title>' |awk '{print $1}' |cut -c8-13)
         set -e
       fi
     done
@@ -1141,14 +1151,14 @@ setup_radarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
           sed -i.bak "${radarr4kURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           radarr4kURLStatus='invalid'
           sed -i.bak "${radarr4kAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           radarr4kAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
           radarr4k_menu
         fi
       elif [ "${radarr4kSetupCheck}" = '{}' ]; then
@@ -1165,14 +1175,15 @@ setup_radarr() {
     convert_url
     set +e
     radarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    radarr4kURLAppCheckResponse=$(curl -s "${convertedURL}" |grep '<title>' |awk '{print $1}' |cut -c8-13)
     set -e
     while [ "${radarr4kURLStatus}" = 'invalid' ]; do
-      if [ "${radarr4kURLCheckResponse}" = '200' ]; then
+      if [[ "${radarr4kURLCheckResponse}" = '200' ]] && [[ "${radarr4kURLAppCheckResponse}" = 'Radarr' ]]; then
         sed -i.bak "${radarr4kURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         radarr4kURLStatus='ok'
         echo -e "${grn}Success!${endColor}"
         echo ''
-      elif [ "${radarr4kURLCheckResponse}" != '200' ]; then
+      elif [[ "${radarr4kURLCheckResponse}" != '200' ]] || [[ "${radarr4kURLAppCheckResponse}" != 'Radarr' ]]; then
         echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
         echo 'Please enter your Radarr 4k URL (IE: http://127.0.0.1:8989/radarr/):'
         read -r providedURL
@@ -1182,6 +1193,7 @@ setup_radarr() {
         convert_url
         set +e
         radarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        radarr4kURLAppCheckResponse=$(curl -s "${convertedURL}" |grep '<title>' |awk '{print $1}' |cut -c8-13)
         set -e
       fi
     done
@@ -1256,14 +1268,14 @@ setup_radarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
           sed -i.bak "${radarr3dURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           radarr3dURLStatus='invalid'
           sed -i.bak "${radarr3dAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           radarr3dAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
           radarr3d_menu
         fi
       elif [ "${radarr3dSetupCheck}" = '{}' ]; then
@@ -1280,9 +1292,10 @@ setup_radarr() {
     convert_url
     set +e
     radarr3dURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+    radarr3dURLAppCheckResponse=$(curl -s "${convertedURL}" |grep '<title>' |awk '{print $1}' |cut -c8-13)
     set -e
     while [ "${radarr3dURLStatus}" = 'invalid' ]; do
-      if [ "${radarr3dURLCheckResponse}" = '200' ]; then
+      if [[ "${radarr3dURLCheckResponse}" = '200' ]] && [[ "${radarr3dURLAppCheckResponse}" = 'Radarr' ]]; then
         sed -i.bak "${radarr3dURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         radarr3dURLStatus='ok'
         echo -e "${grn}Success!${endColor}"
@@ -1297,6 +1310,7 @@ setup_radarr() {
         convert_url
         set +e
         radarr3dURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        radarr3dURLAppCheckResponse=$(curl -s "${convertedURL}" |grep '<title>' |awk '{print $1}' |cut -c8-13)
         set -e
       fi
     done
@@ -1375,14 +1389,14 @@ setup_tautulli() {
       echo -e "${ylw}Do you wish to continue?${endColor}"
       echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
       read -r continuePrompt
-      if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
+      if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
         echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-      elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
+      elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
         sed -i.bak "${tautulliURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
         tautulliURLStatus='invalid'
         sed -i.bak "${tautulliAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
         tautulliAPIKeyStatus='invalid'
-      elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
+      elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
         main_menu
       fi
     elif [ "${tautulliSetupCheck}" = '{}' ]; then
@@ -1399,14 +1413,15 @@ setup_tautulli() {
   convert_url
   set +e
   tautulliURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
+  tautulliURLAppCheckResponse=$(curl -s "${convertedURL}"auth/login?redirect_uri=/tautulli/ |grep '<title>' |awk '{print $1}' |cut -c8-)
   set -e
   while [ "${tautulliURLStatus}" = 'invalid' ]; do
-    if [ "${tautulliURLCheckResponse}" = '200' ]; then
+    if [[ "${tautulliURLCheckResponse}" = '200' ]] && [[ "${tautulliURLAppCheckResponse}" = 'Tautulli' ]]; then
       sed -i.bak "${tautulliURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
       tautulliURLStatus='ok'
       echo -e "${grn}Success!${endColor}"
       echo ''
-    elif [ "${tautulliURLCheckResponse}" != '200' ]; then
+    elif [[ "${tautulliURLCheckResponse}" != '200' ]] && [[ "${tautulliURLAppCheckResponse}" = 'Tautulli' ]]; then
       echo -e "${red}There was an error while attempting to validate the provided URL!${endColor}"
       echo 'Please enter your Tautulli URL (IE: http://127.0.0.1:8181/tautulli/):'
       read -r providedURL
@@ -1416,6 +1431,7 @@ setup_tautulli() {
       convert_url
       set +e
       tautulliURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
+      tautulliURLAppCheckResponse=$(curl -s "${convertedURL}"auth/login?redirect_uri=/tautulli/ |grep '<title>' |awk '{print $1}' |cut -c8-)
       set -e
     fi
   done
