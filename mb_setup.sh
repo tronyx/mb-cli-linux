@@ -100,7 +100,7 @@ root_check() {
 
 # Function to check Bash is >=4 and, if not, exit w/ message
 check_bash() {
-  bashMajorVersion=$(bash --version | grep -Po 'bash, version \K\w+')
+  bashMajorVersion=$(bash --version |head -1 |awk '{print $4}' |cut -c1)
   if [ "${bashMajorVersion}" -lt '4' ]; then
     echo -e "${red}This script requires Bash v4 or higher!${endColor}"
     echo -e "${ylw}Please upgrade Bash on this system and then try again.${endColor}"
@@ -114,7 +114,7 @@ check_sed() {
   if [ "${packageManager}" = 'mac' ]; then
     sedMajorVersion=$(gsed --version |head -1 |awk '{print $4}' |cut -c1)
   else
-    sedMajorVersion=$(sed --version | grep -Po '.* \K\d+(?=(\.\d+)+)')
+    sedMajorVersion=$(sed --version |head -1 |awk '{print $4}' |cut -c1)
   fi
   if [ "${sedMajorVersion}" -lt '4' ]; then
     echo -e "${red}This script requires Sed v4 or higher!${endColor}"
@@ -486,9 +486,9 @@ prompt_for_plex_server() {
     convert_url
     set +e
     mbURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
-    userMBApiVersionOne=$(curl -s https://tronflix.app/mediabutler/version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $1}')
-    userMBApiVersionTwo=$(curl -s https://tronflix.app/mediabutler/version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $2}')
-    userMBApiVersionThree=$(curl -s https://tronflix.app/mediabutler/version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $3}')
+    userMBApiVersionOne=$(curl -s --connect-timeout 10 "${convertedURL}"version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $1}')
+    userMBApiVersionTwo=$(curl -s --connect-timeout 10 "${convertedURL}"version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $2}')
+    userMBApiVersionThree=$(curl -s --connect-timeout 10 "${convertedURL}"version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $3}')
     set -e
     if [[ "${userMBApiVersionOne}" -ge '1' ]] && [[ "${userMBApiVersionTwo}" -ge '1' ]] && [[ "${userMBApiVersionThree}" -ge '12' ]]; then
       mbAPIStatus='ok'
