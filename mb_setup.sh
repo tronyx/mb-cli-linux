@@ -362,8 +362,8 @@ get_plex_creds() {
 # Function to check that the provided Plex credentials are valid
 check_plex_creds() {
   endpoint='plex'
-  echo "Now we're going to make sure you provided valid credentials..."
   while [ "${plexCredsStatus}" = 'invalid' ]; do
+    echo "Now we're going to make sure you provided valid credentials..."
     if [ "${plexCredsOption}" == '1' ]; then
       curl -s --location --request POST "${mbLoginURL}" \
       -H "${mbClientID}" \
@@ -464,6 +464,15 @@ prompt_for_plex_server() {
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
     --data "authToken=${plexToken}&machineId=${plexServerMachineID}")
+  if [[ "${userMBURL}" != *'Error'* ]]; then
+    :
+  elif [[ "${userMBURL}" =~ 'Error' ]]; then
+    echo -e "${red}Unable to automatically retrieve your MediaButler URL!${endColor}"
+    echo -e "${ylw}This is typically indicative of port 9876 not being forwarded.${endColor}"
+    echo -e "${ylw}Please check your port forwarding and then try again.${endColor}"
+    reset_plex
+    exit 0
+  fi
   plexServerMBToken=$(jq .servers["${plexServerArrayElement}"].token "${plexCredsFile}" |tr -d '"')
   echo -e "${grn}Done!${endColor}"
   echo ''
@@ -490,7 +499,7 @@ prompt_for_plex_server() {
     userMBApiVersionTwo=$(curl -s --connect-timeout 10 "${convertedURL}"version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $2}')
     userMBApiVersionThree=$(curl -s --connect-timeout 10 "${convertedURL}"version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $3}')
     set -e
-    if [[ "${userMBApiVersionOne}" -ge '1' ]] && [[ "${userMBApiVersionTwo}" -ge '1' ]] && [[ "${userMBApiVersionThree}" -ge '12' ]]; then
+    if [[ "${userMBApiVersionOne}" -gt '1' ]] || [[ "${userMBApiVersionTwo}" -gt '1' ]] || [[ "${userMBApiVersionThree}" -ge '12' ]]; then
       mbAPIStatus='ok'
     else
       mbAPIStatus='bad'
@@ -512,10 +521,19 @@ prompt_for_plex_server() {
         convert_url
         set +e
         mbURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
+        userMBApiVersionOne=$(curl -s --connect-timeout 10 "${convertedURL}"version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $1}')
+        userMBApiVersionTwo=$(curl -s --connect-timeout 10 "${convertedURL}"version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $2}')
+        userMBApiVersionThree=$(curl -s --connect-timeout 10 "${convertedURL}"version |jq .apiVersion |tr -d '"' |awk -F '.' '{print $3}')
         set -e
+        if [[ "${userMBApiVersionOne}" -gt '1' ]] || [[ "${userMBApiVersionTwo}" -gt '1' ]] || [[ "${userMBApiVersionThree}" -ge '12' ]]; then
+          mbAPIStatus='ok'
+        else
+          mbAPIStatus='bad'
+        fi
       elif [[ "${mbAPIStatus}" = 'bad' ]]; then
         echo -e "${red}The version of the API that you're running appears to be out of date!${endColor}"
         echo -e "${org}Please update your MediaButler installation before continuing.${endColor}"
+        reset_plex
         exit 0
       fi
     done
