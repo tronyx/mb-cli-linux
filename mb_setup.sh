@@ -1769,7 +1769,7 @@ now_playing() {
         playbackType=$(echo "${transcodeDecision}" |awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
         profile=$(jq .quality_profile "${nowPlayingRawFile}" |tr -d '"')
         sessionKey=$(jq .session_key "${nowPlayingRawFile}" |tr -d '"')
-        echo "============================================================" > "${nowPlayingDataFile}"
+        echo -e "${lblu}============================================================${endColor}" > "${nowPlayingDataFile}"
         echo -e "${org}Playback:${endColor} ${playbackStatus^}" >> "${nowPlayingDataFile}"
         echo -e "${org}User:${endColor} ${username}" >> "${nowPlayingDataFile}"
         echo -e "${org}IP Address:${endColor} ${ipAddress}" >> "${nowPlayingDataFile}"
@@ -1778,7 +1778,7 @@ now_playing() {
         echo -e "${org}Playback Type:${endColor} ${playbackType}" >> "${nowPlayingDataFile}"
         echo -e "${org}Proflie:${endColor} ${profile}" >> "${nowPlayingDataFile}"
         echo -e "${org}Session Key:${endColor} ${sessionKey}" >> "${nowPlayingDataFile}"
-        echo "============================================================" >> "${nowPlayingDataFile}"
+        echo -e "${lblu}============================================================${endColor}" >> "${nowPlayingDataFile}"
         echo ''
         cat "${nowPlayingDataFile}"
       elif [ "$mediaType" = 'episode' ]; then
@@ -1797,7 +1797,7 @@ now_playing() {
         playbackType=$(echo "${transcodeDecision}" |awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
         profile=$(jq .quality_profile "${nowPlayingRawFile}" |tr -d '"')
         sessionKey=$(jq .session_key "${nowPlayingRawFile}" |tr -d '"')
-        echo "============================================================" > "${nowPlayingDataFile}"
+        echo -e "${lblu}============================================================${endColor}" > "${nowPlayingDataFile}"
         echo -e "${org}Playback:${endColor} ${playbackStatus^}" >> "${nowPlayingDataFile}"
         echo -e "${org}User:${endColor} ${username}" >> "${nowPlayingDataFile}"
         echo -e "${org}IP Address:${endColor} ${ipAddress}" >> "${nowPlayingDataFile}"
@@ -1806,7 +1806,7 @@ now_playing() {
         echo -e "${org}Playback Type:${endColor} ${playbackType}" >> "${nowPlayingDataFile}"
         echo -e "${org}Proflie:${endColor} ${profile}" >> "${nowPlayingDataFile}"
         echo -e "${org}Session Key:${endColor} ${sessionKey}" >> "${nowPlayingDataFile}"
-        echo "============================================================" >> "${nowPlayingDataFile}"
+        echo -e "${lblu}============================================================${endColor}" >> "${nowPlayingDataFile}"
         echo ''
         cat "${nowPlayingDataFile}"
       elif [ "$mediaType" = 'track' ]; then
@@ -1822,7 +1822,7 @@ now_playing() {
         playbackType=$(echo "${transcodeDecision}" |awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
         profile=$(jq .quality_profile "${nowPlayingRawFile}" |tr -d '"')
         sessionKey=$(jq .session_key "${nowPlayingRawFile}" |tr -d '"')
-        echo "============================================================" > "${nowPlayingDataFile}"
+        echo -e "${lblu}============================================================${endColor}" > "${nowPlayingDataFile}"
         echo -e "${org}Playback:${endColor} ${playbackStatus^}" >> "${nowPlayingDataFile}"
         echo -e "${org}User:${endColor} ${username}" >> "${nowPlayingDataFile}"
         echo -e "${org}IP Address:${endColor} ${ipAddress}" >> "${nowPlayingDataFile}"
@@ -1830,8 +1830,8 @@ now_playing() {
         echo -e "${org}Playing:${endColor} ${playing}" >> "${nowPlayingDataFile}"
         echo -e "${org}Playback Type:${endColor} ${playbackType}" >> "${nowPlayingDataFile}"
         echo -e "${org}Proflie:${endColor} ${profile}" >> "${nowPlayingDataFile}"
-        echo -e"${org}Session Key:${endColor} ${sessionKey}" >> "${nowPlayingDataFile}"
-        echo "============================================================" >> "${nowPlayingDataFile}"
+        echo -e "${org}Session Key:${endColor} ${sessionKey}" >> "${nowPlayingDataFile}"
+        echo -e "${lblu}============================================================${endColor}" >> "${nowPlayingDataFile}"
         echo ''
         cat "${nowPlayingDataFile}"
       fi
