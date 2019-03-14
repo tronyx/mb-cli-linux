@@ -43,7 +43,7 @@ jsonEnvFile='data.json'
 plexTokenFile="${tempDir}plex_token.txt"
 plexServersFile="${tempDir}plex_server_list.txt"
 numberedPlexServersFile="${tempDir}numbered_plex_server_list.txt"
-tautulliConfigFile="${tempDir}tautulli_config.txt"
+adminCheckFile="${tempDir}admin_check.txt"
 rawArrProfilesFile="${tempDir}raw_arr_profiles.txt"
 arrProfilesFile="${tempDir}arr_profiles.txt"
 numberedArrProfilesFile="${tempDir}numbered_arr_profiles.txt"
@@ -55,6 +55,13 @@ sonarr4kConfigFile="${tempDir}sonarr4k_config.txt"
 radarrConfigFile="${tempDir}radarr_config.txt"
 radarr4kConfigFile="${tempDir}radarr4k_config.txt"
 radarr3dConfigFile="${tempDir}radarr3d_config.txt"
+tautulliConfigFile="${tempDir}tautulli_config.txt"
+nowPlayingRawFile="${tempDir}now_playing_raw.txt"
+nowPlayingDataFile="${tempDir}now_playing_data.txt"
+historyRawFile="${tempDir}history_raw.txt"
+historyDataFile="${tempDir}history_data.txt"
+durationDataFile="${tempDir}duration_data.txt"
+#combinedHistoryDataFile="${tempDir}combined_history_data.txt"
 
 # Define text colors
 readonly blu='\e[34m'
@@ -65,6 +72,7 @@ readonly ylw='\e[33m'
 readonly org='\e[38;5;202m'
 readonly lorg='\e[38;5;130m'
 readonly mgt='\e[35m'
+readonly bold='\e[1m'
 readonly endColor='\e[0m'
 
 # Script Information
@@ -206,8 +214,9 @@ create_dir() {
 
 # Cleanup temp files
 cleanup() {
-  rm -rf "${tempDir}"/*.txt || true
+  rm -rf "${tempDir}"*.txt || true
   rm -rf "${scriptname}".bak || true
+  rm -rf "${tempDir}"/pacapt || true
 }
 trap 'cleanup' 0 1 3 6 14 15
 
@@ -484,7 +493,8 @@ prompt_for_plex_server() {
   if ! [[ "${mbURLConfirmation}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
   elif [[ "${mbURLConfirmation}" =~ ^(yes|y|Yes|Y)$ ]]; then
-    :
+    sed -i.bak "${mbURLStatusLineNum} s/mbURLStatus='[^']*'/mbURLStatus='ok'/" "${scriptname}"
+    mbURLStatus='ok'
   elif [[ "${mbURLConfirmation}" =~ ^(no|n|No|N)$ ]]; then
     echo 'Please enter the correct MediaButler URL:'
     read -r providedURL
@@ -539,6 +549,20 @@ prompt_for_plex_server() {
   fi
 }
 
+# Function to determine whether user has admin permissions
+check_admin() {
+  curl -s --location --request GET "${userMBURL}user/@me/" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" |jq .permissions > "${adminCheckFile}"
+  adminCheckResponse=$(grep -i admin "${adminCheckFile}" |awk '{print $1}' |tr -d '"')
+  if [ "${adminCheckResponse}" = 'ADMIN' ]; then
+    isAdmin='true'
+  elif [ "${adminCheckResponse}" != 'ADMIN' ]; then
+    isAdmin='false'
+  fi
+}
+
 # Function to create environment variables file
 create_env_file() {
   echo "plexToken	${plexToken}" > "${envFile}"
@@ -546,6 +570,7 @@ create_env_file() {
   echo "mbToken	${plexServerMBToken}" >> "${envFile}"
   echo "machineId	${plexServerMachineID}" >> "${envFile}"
   echo "mbURL	${userMBURL}" >> "${envFile}"
+  echo "admin	${isAdmin}" >> "${envFile}"
   jq '. | split("\n") | map( split("\t") | {name: .[0], value: .[1]} ) | {data: .} ' -R -s "${envFile}" > "${jsonEnvFile}"
 }
 
@@ -573,6 +598,7 @@ create_env_file() {
 exit_menu() {
   echo -e "${red}This will exit the program and any unfinished config setup will be lost.${endColor}"
   echo -e "${ylw}Are you sure you wish to exit?${endColor}"
+  echo ''
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r exitPrompt
   if ! [[ "${exitPrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
@@ -608,38 +634,22 @@ main_menu() {
   echo '4) Playback Information'
   echo '5) Library Information'
   echo '6) Media Search'
-  echo '7) Exit'
+  echo '7) Reset Config'
+  echo '8) Exit'
   echo ''
   read -rp 'Selection: ' mainMenuSelection
   echo ''
-  if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5|6|7)$ ]]; then
+  if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5|6|7|8)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
     main_menu
   elif [ "${mainMenuSelection}" = '1' ]; then
-    if [[ -e "${jsonEnvFile}" ]]; then
-      sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
-      plexToken=$(jq '.data[] | select(.name=="plexToken")' "${jsonEnvFile}" |jq .value |tr -d '"')
-      selectedPlexServerName=$(jq '.data[] | select(.name=="serverName")' "${jsonEnvFile}" |jq .value |tr -d '"')
-      plexServerMBToken=$(jq '.data[] | select(.name=="mbToken")' "${jsonEnvFile}" |jq .value |tr -d '"')
-      plexServerMachineID=$(jq '.data[] | select(.name=="machineId")' "${jsonEnvFile}" |jq .value |tr -d '"')
-      userMBURL=$(jq '.data[] | select(.name=="mbURL")' "${jsonEnvFile}" |jq .value |tr -d '"')
-    elif [[ ! -f "${jsonEnvFile}" ]]; then
-      get_plex_creds
-      check_plex_creds
+    if [ "${isAdmin}" != 'true' ]; then
+      echo -e "${red}You do not have permission to access this menu!${endColor}"
+      sleep 3
+      main_menu
+    elif [ "${isAdmin}" = 'true' ]; then
+      endpoint_menu
     fi
-    if [[ -z "${plexToken}" ]]; then
-      get_plex_token
-    else
-      :
-    fi
-    if [[ -z "${selectedPlexServerName}" ]] || [[ -z "${plexServerMachineID}" ]] || [[ -z "${userMBURL}" ]] || [[ -z "${plexServerMBToken}" ]]; then
-      create_plex_servers_list
-      prompt_for_plex_server
-    else
-      :
-    fi
-    create_env_file
-    endpoint_menu
   elif [ "${mainMenuSelection}" = '2' ]; then
     requests_menu
   elif [ "${mainMenuSelection}" = '3' ]; then
@@ -651,6 +661,8 @@ main_menu() {
   elif [ "${mainMenuSelection}" = '6' ]; then
     search_menu
   elif [ "${mainMenuSelection}" = '7' ]; then
+    reset
+  elif [ "${mainMenuSelection}" = '8' ]; then
     exit_menu
   fi
 }
@@ -661,7 +673,7 @@ requests_menu() {
   echo '*            ~Requests Menu~            *'
   echo '*****************************************'
   echo 'Please select from the following options:'
-  echo "        (${red}*${endColor} indicates Admin only)         "
+  echo -e "        (${red}*${endColor} indicates Admin only)         "
   echo ''
   echo '1) Submit Request'
   echo -e "2) Manage Requests${red}*${endColor}"
@@ -677,9 +689,15 @@ requests_menu() {
     echo -e "${red}Not setup yet!${endColor}"
     exit 0
   elif [ "${mainMenuSelection}" = '2' ]; then
-    #manage_requests_menu
-    echo -e "${red}Not setup yet!${endColor}"
-    exit 0
+    if [ "${isAdmin}" != 'true' ]; then
+      echo -e "${red}You do not have permission to access this menu!${endColor}"
+      sleep 3
+      main_menu
+    elif [ "${isAdmin}" = 'true' ]; then
+      #manage_requests_menu
+      echo -e "${red}Not setup yet!${endColor}"
+      exit 0
+    fi
   elif [ "${mainMenuSelection}" = '3' ]; then
     main_menu
   fi
@@ -691,10 +709,10 @@ issues_menu() {
   echo '*             ~Issues Menu~             *'
   echo '*****************************************'
   echo 'Please select from the following options"'
-  echo "        (${red}*${endColor} indicates Admin only)         "
+  echo -e "        (${red}*${endColor} indicates Admin only)         "
   echo ''
   echo '1) Add Issue'
-  echo "2) Manage Issues${red}*${endColor}"
+  echo -e "2) Manage Issues${red}*${endColor}"
   echo '3) Back to Main Menu'
   echo ''
   read -rp 'Selection: ' issuesMenuSelection
@@ -707,9 +725,15 @@ issues_menu() {
     echo -e "${red}Not setup yet!${endColor}"
     exit 0
   elif [ "${issuesMenuSelection}" = '2' ]; then
-    #manage_issues_menu
-    echo -e "${red}Not setup yet!${endColor}"
-    exit 0
+    if [ "${isAdmin}" != 'true' ]; then
+      echo -e "${red}You do not have permission to access this menu!${endColor}"
+      sleep 3
+      main_menu
+    elif [ "${isAdmin}" = 'true' ]; then
+      #manage_issues_menu
+      echo -e "${red}Not setup yet!${endColor}"
+      exit 0
+    fi
   elif [ "${issuesMenuSelection}" = '3' ]; then
     main_menu
   fi
@@ -721,10 +745,10 @@ playback_menu() {
   echo '*            ~Playback Menu~            *'
   echo '*****************************************'
   echo 'Please select from the following options"'
-  echo "        (${red}*${endColor} indicates Admin only)         "
+  echo -e "        (${red}*${endColor} indicates Admin only)         "
   echo ''
   echo '1) Playback History'
-  echo "2) Now Playing${red}*${endColor}"
+  echo -e "2) Now Playing${red}*${endColor}"
   echo '3) Back to Main Menu'
   echo ''
   read -rp 'Selection: ' playbackMenuSelection
@@ -733,16 +757,23 @@ playback_menu() {
     echo -e "${red}You did not specify a valid option!${endColor}"
     playback_menu
   elif [ "${playbackMenuSelection}" = '1' ]; then
-    #playback_history
-    echo -e "${red}Not setup yet!${endColor}"
-    exit 0
+    playback_history
   elif [ "${playbackMenuSelection}" = '2' ]; then
-    #now_playing
-    echo -e "${red}Not setup yet!${endColor}"
-    exit 0
+    if [ "${isAdmin}" != 'true' ]; then
+      echo -e "${red}You do not have permission to access this menu!${endColor}"
+      sleep 3
+      main_menu
+    elif [ "${isAdmin}" = 'true' ]; then
+      now_playing
+    fi
   elif [ "${playbackMenuSelection}" = '3' ]; then
     main_menu
   fi
+}
+
+# Function to generate numbered list of Plex libraries
+create_plex_libraries_list() {
+  foo
 }
 
 # Function to display the library menu
@@ -811,8 +842,7 @@ endpoint_menu(){
   else
     echo -e "3) ${red}Tautulli${endColor}"
   fi
-  echo '4) Reset'
-  echo '5) Back to Main Menu'
+  echo '4) Back to Main Menu'
   echo ''
   read -rp 'Selection: ' endpointMenuSelection
   echo ''
@@ -826,8 +856,6 @@ endpoint_menu(){
   elif [ "${endpointMenuSelection}" = '3' ]; then
     setup_tautulli
   elif [ "${endpointMenuSelection}" = '4' ]; then
-    reset
-  elif [ "${endpointMenuSelection}" = '5' ]; then
     main_menu
   fi
 }
@@ -1719,53 +1747,212 @@ setup_tautulli() {
   fi
 }
 
+# Function to gather NowPlaying stats from Tautulli and display it
+now_playing() {
+  endpoint='tautulli'
+  numberOfCurrentStreams=$(curl -s --location --request GET "${userMBURL}${endpoint}/activity" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" |jq .data.sessions[].title |wc -l)
+  if [[ ${numberOfCurrentStreams} -gt '0' ]]; then
+    for stream in $(seq 0 $((${numberOfCurrentStreams}-1))); do
+      curl -s --location --request GET "${userMBURL}${endpoint}/activity" \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" |jq .data.sessions["${stream}"] > "${nowPlayingRawFile}"
+      mediaType=$(jq .media_type "${nowPlayingRawFile}" |tr -d '"')
+      if [ "$mediaType" = 'movie' ]; then
+        status=$(jq .state "${nowPlayingRawFile}" |tr -d '"')
+        playbackStatus=$(echo "${status^}")
+        username=$(jq .username "${nowPlayingRawFile}" |tr -d '"')
+        ipAddress=$(jq .ip_address "${nowPlayingRawFile}" |tr -d '"')
+        device=$(jq .player "${nowPlayingRawFile}" |tr -d '"')
+        title=$(jq .title "${nowPlayingRawFile}" |tr -d '"')
+        titleYear=$(jq .year "${nowPlayingRawFile}" |tr -d '"')
+        playing=$(echo "${title} (${titleYear})")
+        transcodeDecision=$(jq .transcode_decision "${nowPlayingRawFile}" |tr -d '"')
+        playbackType=$(echo "${transcodeDecision}" |awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
+        profile=$(jq .quality_profile "${nowPlayingRawFile}" |tr -d '"')
+        sessionKey=$(jq .session_key "${nowPlayingRawFile}" |tr -d '"')
+        echo -e "${lblu}============================================================${endColor}" > "${nowPlayingDataFile}"
+        echo -e "${org}Playback:${endColor} ${playbackStatus^}" >> "${nowPlayingDataFile}"
+        echo -e "${org}User:${endColor} ${username}" >> "${nowPlayingDataFile}"
+        echo -e "${org}IP Address:${endColor} ${ipAddress}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Device:${endColor} ${device}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Playing:${endColor} ${title} (${titleYear})" >> "${nowPlayingDataFile}"
+        echo -e "${org}Playback Type:${endColor} ${playbackType}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Proflie:${endColor} ${profile}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Session Key:${endColor} ${sessionKey}" >> "${nowPlayingDataFile}"
+        echo -e "${lblu}============================================================${endColor}" >> "${nowPlayingDataFile}"
+        cat "${nowPlayingDataFile}"
+      elif [ "$mediaType" = 'episode' ]; then
+        playbackStatus=$(jq .state "${nowPlayingRawFile}" |tr -d '"')
+        username=$(jq .username "${nowPlayingRawFile}" |tr -d '"')
+        ipAddress=$(jq .ip_address "${nowPlayingRawFile}" |tr -d '"')
+        device=$(jq .player "${nowPlayingRawFile}" |tr -d '"')
+        showName=$(jq .grandparent_title "${nowPlayingRawFile}" |tr -d '"')
+        parentTitle=$(jq .parent_media_index "${nowPlayingRawFile}")
+        seasonNum=$(printf "%02d" ${parentTitle})
+        mediaIndex=$(jq .media_index "${nowPlayingRawFile}" |tr -d '"')
+        episodeNum=$(printf "%02d" ${mediaIndex})
+        title=$(jq .title "${nowPlayingRawFile}" |tr -d '"')
+        playing=$(echo "${showName} - S${seasonNum}E${episodeNum} - ${title}")
+        transcodeDecision=$(jq .transcode_decision "${nowPlayingRawFile}" |tr -d '"')
+        playbackType=$(echo "${transcodeDecision}" |awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
+        profile=$(jq .quality_profile "${nowPlayingRawFile}" |tr -d '"')
+        sessionKey=$(jq .session_key "${nowPlayingRawFile}" |tr -d '"')
+        echo -e "${lblu}============================================================${endColor}" > "${nowPlayingDataFile}"
+        echo -e "${org}Playback:${endColor} ${playbackStatus^}" >> "${nowPlayingDataFile}"
+        echo -e "${org}User:${endColor} ${username}" >> "${nowPlayingDataFile}"
+        echo -e "${org}IP Address:${endColor} ${ipAddress}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Device:${endColor} ${device}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Playing:${endColor} ${playing}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Playback Type:${endColor} ${playbackType}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Proflie:${endColor} ${profile}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Session Key:${endColor} ${sessionKey}" >> "${nowPlayingDataFile}"
+        echo -e "${lblu}============================================================${endColor}" >> "${nowPlayingDataFile}"
+        cat "${nowPlayingDataFile}"
+      elif [ "$mediaType" = 'track' ]; then
+        playbackStatus=$(jq .state "${nowPlayingRawFile}" |tr -d '"')
+        username=$(jq .username "${nowPlayingRawFile}" |tr -d '"')
+        ipAddress=$(jq .ip_address "${nowPlayingRawFile}" |tr -d '"')
+        device=$(jq .player "${nowPlayingRawFile}" |tr -d '"')
+        artistName=$(jq .grandparent_title "${nowPlayingRawFile}" |tr -d '"')
+        albumName=$(jq .parent_title "${nowPlayingRawFile}" |tr -d '"')
+        trackName=$(jq .title "${nowPlayingRawFile}" |tr -d '"')
+        playing=$(echo "${artistName} - ${albumName} - ${trackName}")
+        transcodeDecision=$(jq .transcode_decision "${nowPlayingRawFile}" |tr -d '"')
+        playbackType=$(echo "${transcodeDecision}" |awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
+        profile=$(jq .quality_profile "${nowPlayingRawFile}" |tr -d '"')
+        sessionKey=$(jq .session_key "${nowPlayingRawFile}" |tr -d '"')
+        echo -e "${lblu}============================================================${endColor}" > "${nowPlayingDataFile}"
+        echo -e "${org}Playback:${endColor} ${playbackStatus^}" >> "${nowPlayingDataFile}"
+        echo -e "${org}User:${endColor} ${username}" >> "${nowPlayingDataFile}"
+        echo -e "${org}IP Address:${endColor} ${ipAddress}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Device:${endColor} ${device}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Playing:${endColor} ${playing}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Playback Type:${endColor} ${playbackType}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Proflie:${endColor} ${profile}" >> "${nowPlayingDataFile}"
+        echo -e "${org}Session Key:${endColor} ${sessionKey}" >> "${nowPlayingDataFile}"
+        echo -e "${lblu}============================================================${endColor}" >> "${nowPlayingDataFile}"
+        cat "${nowPlayingDataFile}"
+      fi
+    done
+  elif [[ "${numberOfCurrentStreams}" -le '0' ]]; then
+    echo -e "${org}There are no active streams at this time.${endColor}"
+    echo ''
+    sleep 3
+    playback_menu
+  fi
+}
+
+# Function to gather NowPlaying stats from Tautulli and display it
+playback_history() {
+  endpoint='tautulli'
+  curl -s --location --request GET "${userMBURL}${endpoint}/history" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" |jq . > "${historyRawFile}"
+  numberOfHistoryItems=$(jq .response.data.data[].title "${historyRawFile}" |wc -l)
+  echo -e "${lblu}============================================================${endColor}" > "${historyDataFile}"
+  if [[ ${numberOfHistoryItems} -gt '0' ]]; then
+    totalDuration=$(jq .response.data.total_duration "${historyRawFile}" |tr -d '"')
+    shownDuration=$(jq .response.data.filter_duration "${historyRawFile}" |tr -d '"')
+    echo -e "${bold}Total Duration - Shown Duration${endColor}" > "${durationDataFile}"
+    echo -e "${grn}${totalDuration} - ${shownDuration}${endColor}" >> "${durationDataFile}"
+    column -ts- "${durationDataFile}" >> "${historyDataFile}"
+    for item in $(seq 0 $((${numberOfHistoryItems}-1))); do
+      mediaType=$(jq .response.data.data["${item}"].media_type "${historyRawFile}" |tr -d '"')
+      if [ "$mediaType" = 'movie' ]; then
+        platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" |tr -d '"')
+        device=$(jq .response.data.data["${item}"].player "${historyRawFile}" |tr -d '"')
+        title=$(jq .response.data.data["${item}"].title "${historyRawFile}" |tr -d '"')
+        titleYear=$(jq .response.data.data["${item}"].year "${historyRawFile}" |tr -d '"')
+        playing=$(echo "${title} (${titleYear})")
+        transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" |tr -d '"')
+        playbackType=$(echo "${transcodeDecision}" |awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
+        startTime=$(jq .response.data.data["${item}"].started "${historyRawFile}" |tr -d '"')
+        stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" |tr -d '"')
+        duration=$((${stoppedTime}-${startTime}))
+        friendlyDuration=$(echo "[$(($duration / 60))m $(($duration % 60))s]")
+        echo -e "${bold}${title} (${titleYear})${endColor}" >> "${historyDataFile}"
+        echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
+      elif [ "$mediaType" = 'episode' ]; then
+        platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" |tr -d '"')
+        device=$(jq .response.data.data["${item}"].player "${historyRawFile}" |tr -d '"')
+        #showName=$(jq .response.data.data["${item}"].grandparent_title "${historyRawFile}" |tr -d '"')
+        parentTitle=$(jq .response.data.data["${item}"].parent_media_index "${historyRawFile}")
+        seasonNum=$(printf "%02d" ${parentTitle})
+        mediaIndex=$(jq .response.data.data["${item}"].media_index "${historyRawFile}")
+        episodeNum=$(printf "%02d" ${mediaIndex})
+        title=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" |tr -d '"')
+        playing=$(echo "${title} - S${seasonNum}E${episodeNum}")
+        transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" |tr -d '"')
+        playbackType=$(echo "${transcodeDecision}" |awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
+        startTime=$(jq .response.data.data["${item}"].started "${historyRawFile}" |tr -d '"')
+        stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" |tr -d '"')
+        duration=$((${stoppedTime}-${startTime}))
+        friendlyDuration=$(echo "[$(($duration / 60))m $(($duration % 60))s]")
+        echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
+        echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
+      elif [ "$mediaType" = 'track' ]; then
+        platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" |tr -d '"')
+        device=$(jq .response.data.data["${item}"].player "${historyRawFile}" |tr -d '"')
+        playing=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" |tr -d '"')
+        transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" |tr -d '"')
+        playbackType=$(echo "${transcodeDecision}" |awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
+        startTime=$(jq .response.data.data["${item}"].started "${historyRawFile}" |tr -d '"')
+        stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" |tr -d '"')
+        duration=$((${stoppedTime}-${startTime}))
+        friendlyDuration=$(echo "[$(($duration / 60))m $(($duration % 60))s]")
+        echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
+        echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
+      fi
+    done
+    echo -e "${lblu}============================================================${endColor}" >> "${historyDataFile}"
+    cat "${historyDataFile}"
+  elif [[ "${numberOfHistoryItems}" -le '0' ]]; then
+    echo -e "${org}There is no playback history at this time.${endColor}"
+    echo ''
+    sleep 3
+    playback_menu
+  fi
+}
+
 # Main function to run all functions
 main() {
   create_dir
   checks
   get_line_numbers
+  if [[ -e "${jsonEnvFile}" ]]; then
+    sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
+    sed -i.bak "${plexServerStatusLineNum} s/plexServerStatus='[^']*'/plexServerStatus='ok'/" "${scriptname}"
+    sed -i.bak "${mbURLStatusLineNum} s/mbURLStatus='[^']*'/mbURLStatus='ok'/" "${scriptname}"
+    plexToken=$(jq '.data[] | select(.name=="plexToken")' "${jsonEnvFile}" |jq .value |tr -d '"')
+    selectedPlexServerName=$(jq '.data[] | select(.name=="serverName")' "${jsonEnvFile}" |jq .value |tr -d '"')
+    plexServerMBToken=$(jq '.data[] | select(.name=="mbToken")' "${jsonEnvFile}" |jq .value |tr -d '"')
+    plexServerMachineID=$(jq '.data[] | select(.name=="machineId")' "${jsonEnvFile}" |jq .value |tr -d '"')
+    userMBURL=$(jq '.data[] | select(.name=="mbURL")' "${jsonEnvFile}" |jq .value |tr -d '"')
+    isAdmin=$(jq '.data[] | select(.name=="isAdmin")' "${jsonEnvFile}" |jq .value |tr -d '"')
+  elif [[ ! -f "${jsonEnvFile}" ]]; then
+    get_plex_creds
+    check_plex_creds
+  fi
+  if [[ -z "${plexToken}" ]]; then
+    get_plex_token
+  else
+    :
+  fi
+  if [[ -z "${selectedPlexServerName}" ]] || [[ -z "${plexServerMachineID}" ]] || [[ -z "${userMBURL}" ]] || [[ -z "${plexServerMBToken}" ]]; then
+    create_plex_servers_list
+    prompt_for_plex_server
+  else
+    :
+  fi
+  if [[ -z "${isAdmin}" ]]; then
+    check_admin
+  else
+    :
+  fi
+  create_env_file
   main_menu
-  #if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5|6|7)$ ]]; then
-  #  echo -e "${red}You did not specify a valid option!${endColor}"
-  #  main_menu
-  #elif [ "${mainMenuSelection}" = '1' ]; then
-  #  if [[ -e "${jsonEnvFile}" ]]; then
-  #    sed -i.bak "${plexCredsStatusLineNum} s/plexCredsStatus='[^']*'/plexCredsStatus='ok'/" "${scriptname}"
-  #    plexToken=$(jq '.data[] | select(.name=="plexToken")' "${jsonEnvFile}" |jq .value |tr -d '"')
-  #    selectedPlexServerName=$(jq '.data[] | select(.name=="serverName")' "${jsonEnvFile}" |jq .value |tr -d '"')
-  #    plexServerMBToken=$(jq '.data[] | select(.name=="mbToken")' "${jsonEnvFile}" |jq .value |tr -d '"')
-  #    plexServerMachineID=$(jq '.data[] | select(.name=="machineId")' "${jsonEnvFile}" |jq .value |tr -d '"')
-  #    userMBURL=$(jq '.data[] | select(.name=="mbURL")' "${jsonEnvFile}" |jq .value |tr -d '"')
-  #  elif [[ ! -f "${jsonEnvFile}" ]]; then
-  #    get_plex_creds
-  #    check_plex_creds
-  #  fi
-  #  if [[ -z "${plexToken}" ]]; then
-  #    get_plex_token
-  #  else
-  #    :
-  #  fi
-  #  if [[ -z "${selectedPlexServerName}" ]] || [[ -z "${plexServerMachineID}" ]] || [[ -z "${userMBURL}" ]] || [[ -z "${plexServerMBToken}" ]]; then
-  #    create_plex_servers_list
-  #    prompt_for_plex_server
-  #  else
-  #    :
-  #  fi
-  #  create_env_file
-  #  endpoint_menu
-  #elif [ "${mainMenuSelection}" = '2' ]; then
-  #  requests_menu
-  #elif [ "${mainMenuSelection}" = '3' ]; then
-  #  issues_menu
-  #elif [ "${mainMenuSelection}" = '4' ]; then
-  #  playback_menu
-  #elif [ "${mainMenuSelection}" = '5' ]; then
-  #  library_menu
-  #elif [ "${mainMenuSelection}" = '6' ]; then
-  #  search_menu
-  #elif [ "${mainMenuSelection}" = '7' ]; then
-  #  exit_menu
-  #fi
 }
 
 main
