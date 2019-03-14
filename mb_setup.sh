@@ -685,7 +685,7 @@ requests_menu() {
     echo -e "${red}You did not specify a valid option!${endColor}"
     requests_menu
   elif [ "${mainMenuSelection}" = '1' ]; then
-    #submit_requests_menu
+    #submit_requests
     echo -e "${red}Not setup yet!${endColor}"
     exit 0
   elif [ "${mainMenuSelection}" = '2' ]; then
@@ -694,7 +694,7 @@ requests_menu() {
       sleep 3
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
-      #manage_requests_menu
+      #manage_requests
       echo -e "${red}Not setup yet!${endColor}"
       exit 0
     fi
@@ -1877,7 +1877,6 @@ playback_history() {
       elif [ "$mediaType" = 'episode' ]; then
         platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" |tr -d '"')
         device=$(jq .response.data.data["${item}"].player "${historyRawFile}" |tr -d '"')
-        #showName=$(jq .response.data.data["${item}"].grandparent_title "${historyRawFile}" |tr -d '"')
         parentTitle=$(jq .response.data.data["${item}"].parent_media_index "${historyRawFile}")
         seasonNum=$(printf "%02d" ${parentTitle})
         mediaIndex=$(jq .response.data.data["${item}"].media_index "${historyRawFile}")
@@ -1914,6 +1913,16 @@ playback_history() {
     sleep 3
     playback_menu
   fi
+}
+
+# Function to submit media request
+submit_requests() {
+  endpoint='requests'
+}
+
+# Function to manage media requests
+manage_requests() {
+  endpoint='requests'
 }
 
 # Main function to run all functions
