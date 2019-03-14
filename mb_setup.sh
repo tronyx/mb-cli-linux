@@ -685,7 +685,7 @@ requests_menu() {
     echo -e "${red}You did not specify a valid option!${endColor}"
     requests_menu
   elif [ "${mainMenuSelection}" = '1' ]; then
-    #submit_requests
+    #submit_request_menu
     echo -e "${red}Not setup yet!${endColor}"
     exit 0
   elif [ "${mainMenuSelection}" = '2' ]; then
@@ -694,11 +694,39 @@ requests_menu() {
       sleep 3
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
-      #manage_requests
+      #manage_requests_menu
       echo -e "${red}Not setup yet!${endColor}"
       exit 0
     fi
   elif [ "${mainMenuSelection}" = '3' ]; then
+    main_menu
+  fi
+}
+
+# Function to display the request submission menu
+submit_request_menu() {
+  echo '*****************************************'
+  echo '*          ~Submit A Request~          *'
+  echo '*****************************************'
+  echo 'What would you like to request?'
+  echo ''
+  echo '1) TV Show'
+  echo '2) Movie'
+  echo '3) Music'
+  echo '4) Back to Main Menu'
+  echo ''
+  read -rp 'Selection: ' submitRequestMenuSelection
+  echo ''
+  if ! [[ "${submitRequestMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
+    echo -e "${red}You did not specify a valid option!${endColor}"
+    submit_request_menu
+  elif [ "${issuesMenuSelection}" = '1' ]; then
+    requestType='show'
+  elif [ "${submitRequestMenuSelection}" = '2' ]; then
+    requestType='movie'
+  elif [ "${submitRequestMenuSelection}" = '3' ]; then
+    requestType='music'
+  elif [ "${submitRequestMenuSelection}" = '4' ]; then
     main_menu
   fi
 }
@@ -1918,6 +1946,13 @@ playback_history() {
 # Function to submit media request
 submit_requests() {
   endpoint='requests'
+  if [ "${requestType}" = 'show' ]; then
+    foo
+  elif [ "${requestType}" = 'movie' ]; then
+    foo
+  elif [ "${requestType}" = 'music' ]; then
+    foo
+  fi
 }
 
 # Function to manage media requests
