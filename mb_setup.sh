@@ -2099,13 +2099,13 @@ manage_requests() {
   prompt_for_request_to_manage
   requestStatusCode=$(jq .["${manageRequestArrayElement}"].status "${currentRequestsRawFile}")
   if [ "${requestStatusCode}" = '0' ]; then
-    requestStatus="Pending"
+    requestStatus="${red}Pending${endColor}"
   elif [ "${requestStatusCode}" = '1' ]; then
-    requestStatus="Downloading"
+    requestStatus="${lorg}Downloading${endColor}"
   elif [ "${requestStatusCode}" = '2' ]; then
-    requestStatus="Partially Filled"
+    requestStatus="${ylw}Partially Filled${endColor}"
   elif [ "${requestStatusCode}" = '3' ]; then
-    requestStatus="Filled"
+    requestStatus="${grn}Filled${endColor}"
   fi
   echo -e "${bold}Request information:${endColor}"
   echo ''
