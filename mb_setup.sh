@@ -37,6 +37,7 @@ radarr3dAPIKeyStatus='invalid'
 
 # Define temp dir and files
 tempDir='/tmp/mb_setup/'
+spacePattern="( |\')"
 plexCredsFile="${tempDir}plex_creds_check.txt"
 envFile="${tempDir}envFile.txt"
 jsonEnvFile='data.json'
@@ -61,7 +62,10 @@ nowPlayingDataFile="${tempDir}now_playing_data.txt"
 historyRawFile="${tempDir}history_raw.txt"
 historyDataFile="${tempDir}history_data.txt"
 durationDataFile="${tempDir}duration_data.txt"
-#combinedHistoryDataFile="${tempDir}combined_history_data.txt"
+requestResultsRawFile="${tempDir}requests_results_raw.txt"
+requestsResultsFile="${tempDir}requests_results.txt"
+numberedRequestsResultsFile="${tempDir}numbered_requests_results.txt"
+submitRequestResultFile="${tempDir}submit_request_result.txt"
 
 # Define text colors
 readonly blu='\e[34m'
@@ -684,11 +688,11 @@ requests_menu() {
   if ! [[ "${requestsMenuSelection}" =~ ^(1|2|3)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
     requests_menu
-  elif [ "${mainMenuSelection}" = '1' ]; then
-    #submit_request_menu
-    echo -e "${red}Not setup yet!${endColor}"
-    exit 0
-  elif [ "${mainMenuSelection}" = '2' ]; then
+  elif [ "${requestsMenuSelection}" = '1' ]; then
+    submit_request_menu
+    #echo -e "${red}Not setup yet!${endColor}"
+    #exit 0
+  elif [ "${requestsMenuSelection}" = '2' ]; then
     if [ "${isAdmin}" != 'true' ]; then
       echo -e "${red}You do not have permission to access this menu!${endColor}"
       sleep 3
@@ -698,7 +702,7 @@ requests_menu() {
       echo -e "${red}Not setup yet!${endColor}"
       exit 0
     fi
-  elif [ "${mainMenuSelection}" = '3' ]; then
+  elif [ "${requestsMenuSelection}" = '3' ]; then
     main_menu
   fi
 }
@@ -720,12 +724,16 @@ submit_request_menu() {
   if ! [[ "${submitRequestMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
     submit_request_menu
-  elif [ "${issuesMenuSelection}" = '1' ]; then
-    requestType='show'
+  elif [ "${submitRequestMenuSelection}" = '1' ]; then
+    requestType='tv'
+    submit_requests
   elif [ "${submitRequestMenuSelection}" = '2' ]; then
     requestType='movie'
+    submit_requests
   elif [ "${submitRequestMenuSelection}" = '3' ]; then
     requestType='music'
+    echo -e "${red}Not setup yet!${endColor}"
+    submit_request_menu
   elif [ "${submitRequestMenuSelection}" = '4' ]; then
     main_menu
   fi
@@ -1891,7 +1899,7 @@ playback_history() {
       if [ "$mediaType" = 'movie' ]; then
         platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" |tr -d '"')
         device=$(jq .response.data.data["${item}"].player "${historyRawFile}" |tr -d '"')
-        title=$(jq .response.data.data["${item}"].title "${historyRawFile}" |tr -d '"')
+        title=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" |tr -d '"')
         titleYear=$(jq .response.data.data["${item}"].year "${historyRawFile}" |tr -d '"')
         playing=$(echo "${title} (${titleYear})")
         transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" |tr -d '"')
@@ -1900,7 +1908,7 @@ playback_history() {
         stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" |tr -d '"')
         duration=$((${stoppedTime}-${startTime}))
         friendlyDuration=$(echo "[$(($duration / 60))m $(($duration % 60))s]")
-        echo -e "${bold}${title} (${titleYear})${endColor}" >> "${historyDataFile}"
+        echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
         echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
       elif [ "$mediaType" = 'episode' ]; then
         platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" |tr -d '"')
@@ -1943,15 +1951,94 @@ playback_history() {
   fi
 }
 
+# Function to create list of request results
+create_request_results_list() {
+  jq .results[].seriesName "${requestResultsRawFile}" |tr -d '"' > "${requestsResultsFile}"
+  requestsResults=''
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'requestsResults=($(cat "${requestsResultsFile}"))'
+  for ((i = 0; i < ${#requestsResults[@]}; ++i)); do
+    position=$(( $i + 1 ))
+    echo "$position) ${requestsResults[$i]}"
+  done > "${numberedRequestsResultsFile}"
+}
+
+# Function to convert spaces in title to plus sign
+convert_request_title() {
+  if [[ "${request}" =~ ${spacePattern} ]]; then
+    convertedRequestTitle=$(echo "${request}" |sed 's/ /+/g')
+  else
+    :
+  fi
+}
+
+# Function to prompt user for desired request
+prompt_for_request_selection() {
+  numberOfOptions=$(echo "${#requestsResults[@]}")
+  cancelOption=$((${numberOfOptions}+1))
+  echo 'Here are your results:'
+  echo ''
+  cat "${numberedRequestsResultsFile}"
+  echo "${cancelOption}) Cancel"
+  echo ''
+  echo 'Which one would you like to request?'
+  read -p "Selection (1-${cancelOption}): " requestsResultsSelection
+  echo ''
+  if [[ "${requestsResultsSelection}" -lt '1' ]] || [[ "${requestsResultsSelection}" -gt "${numberOfOptions}" ]]; then
+    echo -e "${red}You didn't not specify a valid option!${endColor}"
+    echo ''
+    submit_request_menu
+  else
+    requestsResultsArrayElement=$((${requestsResultsSelection}-1))
+    selectedRequestsResult=$(jq .results["${requestsResultsArrayElement}"].seriesName "${requestResultsRawFile}" |tr -d '"')
+  fi
+}
+
 # Function to submit media request
 submit_requests() {
   endpoint='requests'
-  if [ "${requestType}" = 'show' ]; then
-    foo
+  if [ "${requestType}" = 'tv' ]; then
+    mediaDatabase='tvdbId'
+    echo 'Please enter the name of the TV Show you would like to request:'
   elif [ "${requestType}" = 'movie' ]; then
-    foo
+    mediaDatabase='imdbId'
+    echo 'Please enter the name of the Movie you would like to request:'
   elif [ "${requestType}" = 'music' ]; then
-    foo
+    mediaDatabase='unknown'
+    echo 'Please enter the name of the Artist you would like to request:'
+  fi
+  read -r request
+  echo ''
+  convert_request_title
+  curl -s --location --request GET "${userMBURL}${requestType}?query=${convertedRequestTitle}" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" |jq . > "${requestResultsRawFile}"
+  create_request_results_list
+  prompt_for_request_selection
+  mediaID=$(jq .results["${requestsResultsArrayElement}"].id "${requestResultsRawFile}")
+  echo 'Submitting your request...'
+  echo ''
+  submitRequestStatusCode=$(curl -s -o "${submitRequestResultFile}" -w "%{http_code}" --location --request POST "${userMBURL}/${endpoint}" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" \
+  --data-urlencode "type=${requestType}" \
+  --data-urlencode "title=${selectedRequestsResult}" \
+  --data-urlencode "${mediaDatabase}=${mediaID}")
+  if [ "${submitRequestStatusCode}" = '200' ]; then
+    echo -e "${grn}Request submitted successfuly!${endColor}"
+    echo ''
+    requests_menu
+  elif [ "${submitRequestStatusCode}" = '500' ]; then
+    submitRequestResponse=$(jq .message "${submitRequestResultFile}" |tr -d '"')
+    if [ "${submitRequestResponse}" = 'Item Exists' ]; then
+      echo -e "${red}Item already exists!${endColor}"
+      echo ''
+      requests_menu
+    elif [ "${submitRequestResponse}" = 'Request already exists' ]; then
+      echo -e "${red}Item has already been requested!${endColor}"
+      echo ''
+      requests_menu
+    fi
   fi
 }
 
