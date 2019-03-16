@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 #
-# Script to setup/configure MediaButler.
+# Script to work with MediaButler.
+# Assists in configuration and allows you to perform most tasks.
 # Tronyx
+
+# Set parameters
 set -eo pipefail
 IFS=$'\n\t'
 
@@ -35,8 +38,9 @@ radarr4kAPIKeyStatus='invalid'
 radarr3dURLStatus='invalid'
 radarr3dAPIKeyStatus='invalid'
 
-# Define temp dir and files
+# Define temp directory and files
 tempDir='/tmp/mb_setup/'
+spacePattern="( |\')"
 plexCredsFile="${tempDir}plex_creds_check.txt"
 envFile="${tempDir}envFile.txt"
 jsonEnvFile='data.json'
@@ -61,7 +65,15 @@ nowPlayingDataFile="${tempDir}now_playing_data.txt"
 historyRawFile="${tempDir}history_raw.txt"
 historyDataFile="${tempDir}history_data.txt"
 durationDataFile="${tempDir}duration_data.txt"
-#combinedHistoryDataFile="${tempDir}combined_history_data.txt"
+requestResultsRawFile="${tempDir}requests_results_raw.txt"
+requestsResultsFile="${tempDir}requests_results.txt"
+numberedRequestsResultsFile="${tempDir}numbered_requests_results.txt"
+submitRequestResultFile="${tempDir}submit_request_result.txt"
+currentRequestsRawFile="${tempDir}current_requests.txt"
+currentRequestsTitlesFile="${tempDir}current_requests_titles.txt"
+numberedCurrentRequestsFile="${tempDir}numbered_current_requests_titles.txt"
+approveRequestResponseFile="${tempDir}approve_request_response.txt"
+denyRequestResponseFile="${tempDir}deny_request_response.txt"
 
 # Define text colors
 readonly blu='\e[34m'
@@ -75,7 +87,7 @@ readonly mgt='\e[35m'
 readonly bold='\e[1m'
 readonly endColor='\e[0m'
 
-# Script Information
+# Function to gather script information
 get_scriptname() {
   local source
   local dir
@@ -91,7 +103,7 @@ get_scriptname() {
 readonly scriptname="$(get_scriptname)"
 readonly scriptpath="$(cd -P "$(dirname "${scriptname}")" > /dev/null && pwd)"
 
-# Check whether or not user is root or used sudo
+# Check whether or not user is root or used sudo and, if not, do it for them
 root_check() {
   if [[ ${EUID} -ne 0 ]]; then
     echo -e "${red}You didn't run the script as root!${endColor}"
@@ -102,7 +114,7 @@ root_check() {
   fi
 }
 
-# Function to check Bash is >=4 and, if not, exit w/ message
+# Function to check if the installed version of Bash is >=4 and, if not, exit w/ message
 check_bash() {
   bashMajorVersion=$(bash --version |head -1 |awk '{print $4}' |cut -c1)
   if [ "${bashMajorVersion}" -lt '4' ]; then
@@ -113,7 +125,7 @@ check_bash() {
   fi
 }
 
-# Function to check Sed is >= and, if not,  exit w/ message
+# Function to check if the installed version of Sed is >= and, if not,  exit w/ message
 check_sed() {
   if [ "${packageManager}" = 'mac' ]; then
     sedMajorVersion=$(gsed --version |head -1 |awk '{print $4}' |cut -c1)
@@ -206,13 +218,13 @@ checks() {
   check_sed
 }
 
-# Create directory to neatly store temp files
+# Function to create temp directory to neatly store temp files
 create_dir() {
   mkdir -p "${tempDir}"
   chmod 777 "${tempDir}"
 }
 
-# Cleanup temp files
+# Function to cleanup temp files
 cleanup() {
   rm -rf "${tempDir}"*.txt || true
   rm -rf "${scriptname}".bak || true
@@ -220,8 +232,8 @@ cleanup() {
 }
 trap 'cleanup' 0 1 3 6 14 15
 
-# Exit the script if the user hits CTRL+C
-function control_c() {
+# Function to exit the script if the user hits CTRL+C
+control_c() {
   cleanup
   if [ "${endpoint}" = 'plex' ]; then
     reset_plex
@@ -242,7 +254,7 @@ function control_c() {
 }
 trap 'control_c' 2
 
-# Grab status variable line numbers
+# Function to grab status variable line numbers
 get_line_numbers() {
   plexCredsStatusLineNum=$(head -50 "${scriptname}" |grep -En -A1 'Set initial Plex credentials status' |tail -1 | awk -F- '{print $1}')
   plexServerStatusLineNum=$(head -50 "${scriptname}" |grep -En -A1 'Set initial Plex server selection status' |tail -1 | awk -F- '{print $1}')
@@ -314,7 +326,7 @@ reset_tautulli() {
   sed -i.bak "${tautulliAPIKeyStatusLineNum} s/tautulliAPIKeyStatus='[^']*'/tautulliAPIKeyStatus='invalid'/" "${scriptname}"
   tautulliAPIKeyStatus='invalid'
 }
-# All apps and Plex
+# Function to reset all apps and Plex
 reset(){
   echo -e "${red}**WARNING!!!** This will reset ALL setup progress!${endColor}"
   echo -e "${ylw}Do you wish to continue?${endColor}"
@@ -344,10 +356,10 @@ get_plex_creds() {
   endpoint='plex'
   echo 'First thing we need are your Plex credentials so please choose from one of the following options:'
   echo ''
-  echo '1) Plex Username & Password'
-  echo '2) Plex Auth Token'
+  echo -e "${bold}1)${endColor} Plex Username & Password"
+  echo -e "${bold}2)${endColor} Plex Auth Token"
   echo ''
-  read -rp 'Enter your option: ' plexCredsOption
+  read -rp 'Selection: ' plexCredsOption
   echo ''
   if [ "${plexCredsOption}" == '1' ]; then
     echo 'Please enter your Plex username:'
@@ -414,7 +426,7 @@ check_plex_creds() {
   done
 }
 
-# Function to get user's Plex token
+# Function to get user's Plex token if the chose to use credentials
 get_plex_token() {
   endpoint='plex'
   if [ "${plexCredsOption}" == '1' ]; then
@@ -433,7 +445,7 @@ get_plex_token() {
   fi
 }
 
-# Function to create list of Plex servers
+# Function to create list of Plex servers the user owns
 create_plex_servers_list() {
   endpoint='plex'
   jq '.servers[] | select(.owner==true)' "${plexCredsFile}" |jq .name |tr -d '"' > "${plexServersFile}"
@@ -441,7 +453,7 @@ create_plex_servers_list() {
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'plexServers=($(cat "${plexServersFile}"))'
   for ((i = 0; i < ${#plexServers[@]}; ++i)); do
     position=$(( $i + 1 ))
-    echo "$position) ${plexServers[$i]}"
+    echo -e "${bold}$position)${endColor} ${plexServers[$i]}"
   done > "${numberedPlexServersFile}"
 }
 
@@ -549,7 +561,7 @@ prompt_for_plex_server() {
   fi
 }
 
-# Function to determine whether user has admin permissions
+# Function to determine whether user has admin permissions to the selected Plex Server
 check_admin() {
   curl -s --location --request GET "${userMBURL}user/@me/" \
   -H 'Content-Type: application/x-www-form-urlencoded' \
@@ -563,7 +575,7 @@ check_admin() {
   fi
 }
 
-# Function to create environment variables file
+# Function to create environment variables file for persistence
 create_env_file() {
   echo "plexToken	${plexToken}" > "${envFile}"
   echo "serverName	${selectedPlexServerName}" >> "${envFile}"
@@ -622,20 +634,20 @@ convert_url() {
 
 # Function to display the main menu
 main_menu() {
-  echo '*****************************************'
-  echo '*              ~Main Menu~              *'
-  echo '*****************************************'
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*              ~Main Menu~              *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
   echo 'Please select from the following options:'
   echo -e "        (${red}*${endColor} indicates Admin only)         "
   echo ''
-  echo -e "1) Configure Applications${red}*${endColor}"
-  echo '2) Media Requests'
-  echo '3) Media Issues'
-  echo '4) Playback Information'
-  echo '5) Library Information'
-  echo '6) Media Search'
-  echo '7) Reset Config'
-  echo '8) Exit'
+  echo -e "${bold}1)${endColor} Configure Applications${red}*${endColor}"
+  echo -e "${bold}2)${endColor} Media Requests"
+  echo -e "${bold}3)${endColor} Media Issues"
+  echo -e "${bold}4)${endColor} Playback Information"
+  echo -e "${bold}5)${endColor} Library Information"
+  echo -e "${bold}6)${endColor} Media Search"
+  echo -e "${bold}7)${endColor} Reset Config"
+  echo -e "${bold}8)${endColor} Exit"
   echo ''
   read -rp 'Selection: ' mainMenuSelection
   echo ''
@@ -669,51 +681,79 @@ main_menu() {
 
 # Function to display the requests menu
 requests_menu() {
-  echo '*****************************************'
-  echo '*            ~Requests Menu~            *'
-  echo '*****************************************'
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*            ~Requests Menu~            *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
   echo 'Please select from the following options:'
   echo -e "        (${red}*${endColor} indicates Admin only)         "
   echo ''
-  echo '1) Submit Request'
-  echo -e "2) Manage Requests${red}*${endColor}"
-  echo '3) Back to Main Menu'
+  echo -e "${bold}1)${endColor} Submit Request"
+  echo -e "${bold}2)${endColor} Manage Requests${red}*${endColor}"
+  echo -e "${bold}3)${endColor} Back to Main Menu"
   echo ''
   read -rp 'Selection: ' requestsMenuSelection
   echo ''
   if ! [[ "${requestsMenuSelection}" =~ ^(1|2|3)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
     requests_menu
-  elif [ "${mainMenuSelection}" = '1' ]; then
-    #submit_requests_menu
-    echo -e "${red}Not setup yet!${endColor}"
-    exit 0
-  elif [ "${mainMenuSelection}" = '2' ]; then
+  elif [ "${requestsMenuSelection}" = '1' ]; then
+    submit_request_menu
+  elif [ "${requestsMenuSelection}" = '2' ]; then
     if [ "${isAdmin}" != 'true' ]; then
       echo -e "${red}You do not have permission to access this menu!${endColor}"
       sleep 3
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
-      #manage_requests_menu
-      echo -e "${red}Not setup yet!${endColor}"
-      exit 0
+      manage_requests
     fi
-  elif [ "${mainMenuSelection}" = '3' ]; then
+  elif [ "${requestsMenuSelection}" = '3' ]; then
+    main_menu
+  fi
+}
+
+# Function to display the request submission menu
+submit_request_menu() {
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*          ~Submit A Request~           *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
+  echo 'What would you like to request?'
+  echo ''
+  echo -e "${bold}1)${endColor} TV Show"
+  echo -e "${bold}2)${endColor} Movie"
+  echo -e "${bold}3)${endColor} Music"
+  echo -e "${bold}4)${endColor} Back to Main Menu"
+  echo ''
+  read -rp 'Selection: ' submitRequestMenuSelection
+  echo ''
+  if ! [[ "${submitRequestMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
+    echo -e "${red}You did not specify a valid option!${endColor}"
+    submit_request_menu
+  elif [ "${submitRequestMenuSelection}" = '1' ]; then
+    requestType='tv'
+    submit_requests
+  elif [ "${submitRequestMenuSelection}" = '2' ]; then
+    requestType='movie'
+    submit_requests
+  elif [ "${submitRequestMenuSelection}" = '3' ]; then
+    requestType='music'
+    echo -e "${red}Not setup yet!${endColor}"
+    submit_request_menu
+  elif [ "${submitRequestMenuSelection}" = '4' ]; then
     main_menu
   fi
 }
 
 # Function to display the issues menu
 issues_menu() {
-  echo '*****************************************'
-  echo '*             ~Issues Menu~             *'
-  echo '*****************************************'
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*             ~Issues Menu~             *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
   echo 'Please select from the following options"'
   echo -e "        (${red}*${endColor} indicates Admin only)         "
   echo ''
-  echo '1) Add Issue'
-  echo -e "2) Manage Issues${red}*${endColor}"
-  echo '3) Back to Main Menu'
+  echo -e "${bold}1)${endColor} Add Issue"
+  echo -e "${bold}2)${endColor} Manage Issues${red}*${endColor}"
+  echo -e "${bold}3)${endColor} Back to Main Menu"
   echo ''
   read -rp 'Selection: ' issuesMenuSelection
   echo ''
@@ -741,15 +781,15 @@ issues_menu() {
 
 # Function to display the playback menu
 playback_menu() {
-  echo '*****************************************'
-  echo '*            ~Playback Menu~            *'
-  echo '*****************************************'
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*            ~Playback Menu~            *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
   echo 'Please select from the following options"'
   echo -e "        (${red}*${endColor} indicates Admin only)         "
   echo ''
-  echo '1) Playback History'
-  echo -e "2) Now Playing${red}*${endColor}"
-  echo '3) Back to Main Menu'
+  echo -e "${bold}1)${endColor} Playback History"
+  echo -e "${bold}2)${endColor} Now Playing${red}*${endColor}"
+  echo -e "${bold}3)${endColor} Back to Main Menu"
   echo ''
   read -rp 'Selection: ' playbackMenuSelection
   echo ''
@@ -778,20 +818,24 @@ create_plex_libraries_list() {
 
 # Function to display the library menu
 library_menu() {
-  foo
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*         ~Plex Libraries Menu~         *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
+  echo 'Please select from the following options"'
+  echo ''
 }
 
 # Function to display the search menu
 search_menu() {
-  echo '*****************************************'
-  echo '*             ~Search Menu~             *'
-  echo '*****************************************'
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*             ~Search Menu~             *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
   echo 'Please select from the following options"'
   echo ''
-  echo '1) TV Show'
-  echo '2) Movie'
-  echo '3) Music'
-  echo '4) Back to Main Menu'
+  echo -e "${bold}1)${endColor} TV Show"
+  echo -e "${bold}2)${endColor} Movie"
+  echo -e "${bold}3)${endColor} Music"
+  echo -e "${bold}4)${endColor} Back to Main Menu"
   echo ''
   read -rp 'Selection: ' searchMenuSelection
   echo ''
@@ -817,32 +861,32 @@ search_menu() {
 
 # Function to display the endpoint config menu
 endpoint_menu(){
-  echo '*****************************************'
-  echo '*     ~Endpoint Configuration Menu~     *'
-  echo '*****************************************'
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*     ~Endpoint Configuration Menu~     *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
   echo 'Please choose which application you would'
   echo '   like to configure for MediaButler:    '
   echo ''
   if [[ "${sonarrURLStatus}" = 'ok' ]] && [[ "${sonarrAPIKeyStatus}" = 'ok' ]] && [[ "${sonarr4kURLStatus}" = 'ok' ]] && [[ "${sonarr4kAPIKeyStatus}" = 'ok' ]]; then
-    echo -e "1) ${grn}Sonarr${endColor}"
+    echo -e "${bold}1)${endColor} ${grn}Sonarr${endColor}"
   elif [[ "${sonarrURLStatus}" = 'invalid' ]] && [[ "${sonarrAPIKeyStatus}" = 'invalid' ]] && [[ "${sonarr4kURLStatus}" = 'invalid' ]] && [[ "${sonarr4kAPIKeyStatus}" = 'invalid' ]]; then
-    echo -e "1) ${red}Sonarr${endColor}"
+    echo -e "${bold}1)${endColor} ${red}Sonarr${endColor}"
   else
-    echo -e "1) ${ylw}Sonarr${endColor}"
+    echo -e "${bold}1)${endColor} ${ylw}Sonarr${endColor}"
   fi
   if [[ "${radarrURLStatus}" = 'ok' ]] && [[ "${radarrAPIKeyStatus}" = 'ok' ]] && [[ "${radarr4kURLStatus}" = 'ok' ]] && [[ "${radarr4kAPIKeyStatus}" = 'ok' ]] && [[ "${radarr3dURLStatus}" = 'ok' ]] && [[ "${radarr3dAPIKeyStatus}" = 'ok' ]]; then
-    echo -e "2) ${grn}Radarr${endColor}"
+    echo -e "${bold}2)${endColor} ${grn}Radarr${endColor}"
   elif [[ "${radarrURLStatus}" = 'invalid' ]] && [[ "${radarrAPIKeyStatus}" = 'invalid' ]] && [[ "${radarr4kURLStatus}" = 'invalid' ]] && [[ "${radarr4kAPIKeyStatus}" = 'invalid' ]] && [[ "${radarr3dURLStatus}" = 'invalid' ]] && [[ "${radarr3dAPIKeyStatus}" = 'invalid' ]]; then
-    echo -e "2) ${red}Radarr${endColor}"
+    echo -e "${bold}2)${endColor} ${red}Radarr${endColor}"
   else
-    echo -e "2) ${ylw}Radarr${endColor}"
+    echo -e "${bold}2)${endColor} ${ylw}Radarr${endColor}"
   fi
   if [[ "${tautulliURLStatus}" = 'ok' ]] && [[ "${tautulliAPIKeyStatus}" = 'ok' ]]; then
-    echo -e "3) ${grn}Tautulli${endColor}"
+    echo -e "${bold}3)${endColor} ${grn}Tautulli${endColor}"
   else
-    echo -e "3) ${red}Tautulli${endColor}"
+    echo -e "${bold}3)${endColor} ${red}Tautulli${endColor}"
   fi
-  echo '4) Back to Main Menu'
+  echo -e "${bold}4)${endColor} Back to Main Menu"
   echo ''
   read -rp 'Selection: ' endpointMenuSelection
   echo ''
@@ -862,23 +906,23 @@ endpoint_menu(){
 
 # Function to display the Sonarr sub-menu
 sonarr_menu() {
-  echo '*****************************************'
-  echo '*          ~Sonarr Setup Menu~          *'
-  echo '*****************************************'
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*          ~Sonarr Setup Menu~          *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
   echo 'Please choose which version of Sonarr you'
   echo 'would like to configure for MediaButler: '
   echo ''
   if [[ "${sonarrURLStatus}" = 'ok' ]] && [[ "${sonarrAPIKeyStatus}" = 'ok' ]]; then
-    echo -e "1) ${grn}Sonarr${endColor}"
+    echo -e "${bold}1)${endColor} ${grn}Sonarr${endColor}"
   else
-    echo -e "1) ${red}Sonarr${endColor}"
+    echo -e "${bold}1)${endColor} ${red}Sonarr${endColor}"
   fi
   if [[ "${sonarr4kURLStatus}" = 'ok' ]] && [[ "${sonarr4kAPIKeyStatus}" = 'ok' ]]; then
-    echo -e "2) ${grn}Sonarr 4K${endColor}"
+    echo -e "${bold}2)${endColor} ${grn}Sonarr 4K${endColor}"
   else
-    echo -e "2) ${red}Sonarr 4K${endColor}"
+    echo -e "${bold}2)${endColor} ${red}Sonarr 4K${endColor}"
   fi
-  echo '3) Back to Endpoint Menu'
+  echo -e "${bold}3)${endColor} Back to Endpoint Menu"
   echo ''
   read -rp 'Selection: ' sonarrMenuSelection
   echo ''
@@ -894,28 +938,28 @@ sonarr_menu() {
 
 # Function to display the Radarr sub-menu
 radarr_menu() {
-  echo '*****************************************'
-  echo '*          ~Radarr Setup Menu~          *'
-  echo '*****************************************'
+  echo -e "${bold}*****************************************${endColor}"
+  echo -e "${bold}*          ~Radarr Setup Menu~          *${endColor}"
+  echo -e "${bold}*****************************************${endColor}"
   echo 'Please choose which version of Radarr you'
   echo 'would like to configure for MediaButler: '
   echo ''
   if [[ "${radarrURLStatus}" = 'ok' ]] && [[ "${radarrAPIKeyStatus}" = 'ok' ]]; then
-    echo -e "1) ${grn}Radarr${endColor}"
+    echo -e "${bold}1)${endColor} ${grn}Radarr${endColor}"
   else
-    echo -e "1) ${red}Radarr${endColor}"
+    echo -e "${bold}1)${endColor} ${red}Radarr${endColor}"
   fi
   if [[ "${radarr4kURLStatus}" = 'ok' ]] && [[ "${radarr4kAPIKeyStatus}" = 'ok' ]]; then
-    echo -e "2) ${grn}Radarr 4K${endColor}"
+    echo -e "${bold}2)${endColor} ${grn}Radarr 4K${endColor}"
   else
-    echo -e "2) ${red}Radarr 4K${endColor}"
+    echo -e "${bold}2)${endColor} ${red}Radarr 4K${endColor}"
   fi
   if [[ "${radarr3dURLStatus}" = 'ok' ]] && [[ "${radarr3dAPIKeyStatus}" = 'ok' ]]; then
-    echo -e "3) ${grn}Radarr 3D${endColor}"
+    echo -e "${bold}3)${endColor} ${grn}Radarr 3D${endColor}"
   else
-    echo -e "3) ${red}Radarr 3D${endColor}"
+    echo -e "${bold}3)${endColor} ${red}Radarr 3D${endColor}"
   fi
-  echo '4) Back to Endpoint Menu'
+  echo -e "${bold}4)${endColor} Back to Endpoint Menu"
   echo ''
   read -rp 'Selection: ' radarrMenuSelection
   echo ''
@@ -936,7 +980,7 @@ create_arr_profiles_list() {
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'arrProfiles=($(cat "${arrProfilesFile}"))'
   for ((i = 0; i < ${#arrProfiles[@]}; ++i)); do
     position=$(( $i + 1 ))
-    echo "$position) ${arrProfiles[$i]}"
+    echo -e "${bold}$position)${endColor} ${arrProfiles[$i]}"
   done > "${numberedArrProfilesFile}"
 }
 
@@ -981,7 +1025,7 @@ create_arr_root_dirs_list() {
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'arrRootDirs=($(cat "${arrRootDirsFile}"))'
   for ((i = 0; i < ${#arrRootDirs[@]}; ++i)); do
     position=$(( $i + 1 ))
-    echo "$position) ${arrRootDirs[$i]}"
+    echo -e "${bold}$position)${endColor} ${arrRootDirs[$i]}"
   done > "${numberedArrRootDirsFile}"
 }
 
@@ -1863,7 +1907,7 @@ playback_history() {
       if [ "$mediaType" = 'movie' ]; then
         platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" |tr -d '"')
         device=$(jq .response.data.data["${item}"].player "${historyRawFile}" |tr -d '"')
-        title=$(jq .response.data.data["${item}"].title "${historyRawFile}" |tr -d '"')
+        title=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" |tr -d '"')
         titleYear=$(jq .response.data.data["${item}"].year "${historyRawFile}" |tr -d '"')
         playing=$(echo "${title} (${titleYear})")
         transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" |tr -d '"')
@@ -1872,12 +1916,11 @@ playback_history() {
         stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" |tr -d '"')
         duration=$((${stoppedTime}-${startTime}))
         friendlyDuration=$(echo "[$(($duration / 60))m $(($duration % 60))s]")
-        echo -e "${bold}${title} (${titleYear})${endColor}" >> "${historyDataFile}"
+        echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
         echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
       elif [ "$mediaType" = 'episode' ]; then
         platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" |tr -d '"')
         device=$(jq .response.data.data["${item}"].player "${historyRawFile}" |tr -d '"')
-        #showName=$(jq .response.data.data["${item}"].grandparent_title "${historyRawFile}" |tr -d '"')
         parentTitle=$(jq .response.data.data["${item}"].parent_media_index "${historyRawFile}")
         seasonNum=$(printf "%02d" ${parentTitle})
         mediaIndex=$(jq .response.data.data["${item}"].media_index "${historyRawFile}")
@@ -1913,6 +1956,205 @@ playback_history() {
     echo ''
     sleep 3
     playback_menu
+  fi
+}
+
+# Function to create list of request results
+create_request_results_list() {
+  jq .results[].seriesName "${requestResultsRawFile}" |tr -d '"' > "${requestsResultsFile}"
+  requestsResults=''
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'requestsResults=($(cat "${requestsResultsFile}"))'
+  for ((i = 0; i < ${#requestsResults[@]}; ++i)); do
+    position=$(( $i + 1 ))
+    echo -e "${bold}$position)${endColor} ${requestsResults[$i]}"
+  done > "${numberedRequestsResultsFile}"
+}
+
+# Function to convert spaces in title to plus sign
+convert_request_title() {
+  if [[ "${request}" =~ ${spacePattern} ]]; then
+    convertedRequestTitle=$(echo "${request}" |sed 's/ /+/g')
+  else
+    :
+  fi
+}
+
+# Function to prompt user for desired request
+prompt_for_request_selection() {
+  numberOfOptions=$(echo "${#requestsResults[@]}")
+  cancelOption=$((${numberOfOptions}+1))
+  echo 'Here are your results:'
+  echo ''
+  cat "${numberedRequestsResultsFile}"
+  echo -e "${bold}${cancelOption})${endColor} Cancel"
+  echo ''
+  echo 'Which one would you like to request?'
+  read -p "Selection (1-${cancelOption}): " requestsResultsSelection
+  echo ''
+  if [[ "${requestsResultsSelection}" -lt '1' ]] || [[ "${requestsResultsSelection}" -gt "${numberOfOptions}" ]]; then
+    echo -e "${red}You didn't not specify a valid option!${endColor}"
+    echo ''
+    submit_request_menu
+  else
+    requestsResultsArrayElement=$((${requestsResultsSelection}-1))
+    selectedRequestsResult=$(jq .results["${requestsResultsArrayElement}"].seriesName "${requestResultsRawFile}" |tr -d '"')
+  fi
+}
+
+# Function to submit media request
+submit_requests() {
+  endpoint='requests'
+  if [ "${requestType}" = 'tv' ]; then
+    mediaDatabase='tvdbId'
+    echo 'Please enter the name of the TV Show you would like to request:'
+  elif [ "${requestType}" = 'movie' ]; then
+    mediaDatabase='imdbId'
+    echo 'Please enter the name of the Movie you would like to request:'
+  elif [ "${requestType}" = 'music' ]; then
+    mediaDatabase='unknown'
+    echo 'Please enter the name of the Artist you would like to request:'
+  fi
+  read -r request
+  echo ''
+  convert_request_title
+  curl -s --location --request GET "${userMBURL}${requestType}?query=${convertedRequestTitle}" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" |jq . > "${requestResultsRawFile}"
+  create_request_results_list
+  prompt_for_request_selection
+  mediaID=$(jq .results["${requestsResultsArrayElement}"].id "${requestResultsRawFile}")
+  echo 'Submitting your request...'
+  echo ''
+  submitRequestStatusCode=$(curl -s -o "${submitRequestResultFile}" -w "%{http_code}" --location --request POST "${userMBURL}${endpoint}" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" \
+  --data-urlencode "type=${requestType}" \
+  --data-urlencode "title=${selectedRequestsResult}" \
+  --data-urlencode "${mediaDatabase}=${mediaID}")
+  if [ "${submitRequestStatusCode}" = '200' ]; then
+    echo -e "${grn}Request submitted successfully!${endColor}"
+    echo ''
+    requests_menu
+  elif [ "${submitRequestStatusCode}" = '500' ]; then
+    submitRequestResponse=$(jq .message "${submitRequestResultFile}" |tr -d '"')
+    if [ "${submitRequestResponse}" = 'Item Exists' ]; then
+      echo -e "${red}Item already exists!${endColor}"
+      echo ''
+      requests_menu
+    elif [ "${submitRequestResponse}" = 'Request already exists' ]; then
+      echo -e "${red}Item has already been requested!${endColor}"
+      echo ''
+      requests_menu
+    fi
+  fi
+}
+
+# Function to create existing requests list
+create_existing_requests_list() {
+  jq .[].title "${currentRequestsRawFile}" |tr -d '"' > "${currentRequestsTitlesFile}"
+  currentRequests=''
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'currentRequests=($(cat "${currentRequestsTitlesFile}"))'
+  for ((i = 0; i < ${#currentRequests[@]}; ++i)); do
+    position=$(( $i + 1 ))
+    echo -e "${bold}$position)${endColor} ${currentRequests[$i]}"
+  done > "${numberedCurrentRequestsFile}"
+}
+
+# Function to prompt user for request to manage
+prompt_for_request_to_manage() {
+  numberOfOptions=$(echo "${#currentRequests[@]}")
+  cancelOption=$((${numberOfOptions}+1))
+  echo 'Here are the current requests:'
+  echo ''
+  cat "${numberedCurrentRequestsFile}"
+  echo -e "${bold}${cancelOption})${endColor} Cancel"
+  echo ''
+  echo 'Which one would you like to manage?'
+  read -p "Selection (1-${cancelOption}): " manageRequestSelection
+  echo ''
+  if [[ "${manageRequestSelection}" -lt '1' ]] || [[ "${manageRequestSelection}" -gt "${cancelOption}" ]]; then
+    echo -e "${red}You didn't not specify a valid option!${endColor}"
+    echo ''
+    manage_requests
+  elif [ "${manageRequestSelection}" = "${cancelOption}" ]; then
+    requests_menu
+  else
+    manageRequestArrayElement=$((${manageRequestSelection}-1))
+    selectedRequestTitle=$(jq .["${manageRequestArrayElement}"].title "${currentRequestsRawFile}" |tr -d '"')
+    selectedRequestID=$(jq .["${manageRequestArrayElement}"]._id "${currentRequestsRawFile}" |tr -d '"')
+    selectedRequestUser=$(jq .["${manageRequestArrayElement}"].username "${currentRequestsRawFile}" |tr -d '"')
+    selectedRequestDate=$(jq .["${manageRequestArrayElement}"].dateAdded "${currentRequestsRawFile}" |tr -d '"' |cut -c1-10)
+  fi
+}
+
+# Function to manage media requests
+manage_requests() {
+  endpoint='requests'
+  curl -s --location --request GET "${userMBURL}${endpoint}" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" |jq . > "${currentRequestsRawFile}"
+  create_existing_requests_list
+  prompt_for_request_to_manage
+  requestStatusCode=$(jq .["${manageRequestArrayElement}"].status "${currentRequestsRawFile}")
+  if [ "${requestStatusCode}" = '0' ]; then
+    requestStatus="Pending"
+  elif [ "${requestStatusCode}" = '1' ]; then
+    requestStatus="Downloading"
+  elif [ "${requestStatusCode}" = '2' ]; then
+    requestStatus="Partially Filled"
+  elif [ "${requestStatusCode}" = '3' ]; then
+    requestStatus="Filled"
+  fi
+  echo -e "${bold}Request information:${endColor}"
+  echo ''
+  echo -e "${org}Title:${endColor} ${selectedRequestTitle}"
+  echo -e "${org}Submitted By:${endColor} ${selectedRequestUser}"
+  echo -e "${org}Date Requested:${endColor} ${selectedRequestDate}"
+  echo -e "${org}Request Status:${endColor} ${requestStatus}"
+  echo ''
+  echo 'What would you like to do with this request?'
+  echo ''
+  echo -e "${bold}1)${endColor} Approve Request"
+  echo -e "${bold}2)${endColor} Deny Request"
+  echo -e "${bold}3)${endColor} Back to Manage Requests"
+  echo ''
+  read -rp 'Selection: ' manageRequestOption
+  if ! [[ "${manageRequestOption}" =~ ^(1|2|3)$ ]]; then
+    echo -e "${red}You did not specify a valid option!${endColor}"
+    echo ''
+    manage_requests
+  elif [ "${manageRequestOption}" = '1' ]; then
+    approveRequestStatusCode=$(curl -s -o "${approveRequestResponseFile}" -w "%{http_code}" --location --request POST "${userMBURL}${endpoint}/${selectedRequestID}" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}")
+    if [ "${approveRequestStatusCode}" = '200' ]; then
+      echo -e "${grn}Request has been successfully approved!${endColor}"
+      echo ''
+      manage_requests
+    elif [ "${approveRequestStatusCode}" = '400' ]; then
+      echo -e "${red}There was an error while trying to approve the request!${endColor}"
+      echo ''
+      manage_requests
+    fi
+  elif [ "${manageRequestOption}" = '2' ]; then
+    denyRequestStatusCode=$(curl -s -o "${denyRequestResponseFile}" -w "%{http_code}" --location --request DELETE "${userMBURL}${endpoint}/${selectedRequestID}" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}")
+    if [ "${denyRequestStatusCode}" = '200' ]; then
+      echo -e "${grn}Request has been successfully removed!${endColor}"
+      echo ''
+      manage_requests
+    elif [ "${denyRequestStatusCode}" = '500' ]; then
+      echo -e "${red}There was an error while trying to delete the request!${endColor}"
+      echo ''
+      manage_requests
+    fi
+  elif [ "${manageRequestOption}" = '3' ]; then
+    manage_requests
   fi
 }
 
