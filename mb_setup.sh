@@ -66,6 +66,11 @@ requestResultsRawFile="${tempDir}requests_results_raw.txt"
 requestsResultsFile="${tempDir}requests_results.txt"
 numberedRequestsResultsFile="${tempDir}numbered_requests_results.txt"
 submitRequestResultFile="${tempDir}submit_request_result.txt"
+currentRequestsRawFile="${tempDir}current_requests.txt"
+currentRequestsTitlesFile="${tempDir}current_requests_titles.txt"
+numberedCurrentRequestsFile="${tempDir}numbered_current_requests_titles.txt"
+approveRequestResponseFile="${tempDir}approve_request_response.txt"
+denyRequestResponseFile="${tempDir}deny_request_response.txt"
 
 # Define text colors
 readonly blu='\e[34m'
@@ -710,7 +715,7 @@ requests_menu() {
 # Function to display the request submission menu
 submit_request_menu() {
   echo '*****************************************'
-  echo '*          ~Submit A Request~          *'
+  echo '*          ~Submit A Request~           *'
   echo '*****************************************'
   echo 'What would you like to request?'
   echo ''
@@ -2015,9 +2020,10 @@ submit_requests() {
   create_request_results_list
   prompt_for_request_selection
   mediaID=$(jq .results["${requestsResultsArrayElement}"].id "${requestResultsRawFile}")
+  send_request
   echo 'Submitting your request...'
   echo ''
-  submitRequestStatusCode=$(curl -s -o "${submitRequestResultFile}" -w "%{http_code}" --location --request POST "${userMBURL}/${endpoint}" \
+  submitRequestStatusCode=$(curl -s -o "${submitRequestResultFile}" -w "%{http_code}" --location --request POST "${userMBURL}${endpoint}" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -H "${mbClientID}" \
   -H "Authorization: Bearer ${plexServerMBToken}" \
@@ -2025,7 +2031,7 @@ submit_requests() {
   --data-urlencode "title=${selectedRequestsResult}" \
   --data-urlencode "${mediaDatabase}=${mediaID}")
   if [ "${submitRequestStatusCode}" = '200' ]; then
-    echo -e "${grn}Request submitted successfuly!${endColor}"
+    echo -e "${grn}Request submitted successfully!${endColor}"
     echo ''
     requests_menu
   elif [ "${submitRequestStatusCode}" = '500' ]; then
@@ -2042,9 +2048,110 @@ submit_requests() {
   fi
 }
 
+# Function to create existing requests list
+create_existing_requests_list() {
+  jq .[].title "${currentRequestsRawFile}" |tr -d '"' > "${currentRequestsTitlesFile}"
+  currentRequests=''
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'currentRequests=($(cat "${currentRequestsTitlesFile}"))'
+  for ((i = 0; i < ${#currentRequests[@]}; ++i)); do
+    position=$(( $i + 1 ))
+    echo "$position) ${currentRequests[$i]}"
+  done > "${numberedCurrentRequestsFile}"
+}
+
+# Function to prompt user for request to manage
+prompt_for_request_to_manage() {
+  numberOfOptions=$(echo "${#currentRequests[@]}")
+  cancelOption=$((${numberOfOptions}+1))
+  echo 'Here are the current requests:'
+  echo ''
+  cat "${numberedCurrentRequestsFile}"
+  echo "${cancelOption}) Cancel"
+  echo ''
+  echo 'Which one would you like to manage?'
+  read -p "Selection (1-${cancelOption}): " manageRequestSelection
+  echo ''
+  if [[ "${manageRequestSelection}" -lt '1' ]] || [[ "${manageRequestSelection}" -gt "${numberOfOptions}" ]]; then
+    echo -e "${red}You didn't not specify a valid option!${endColor}"
+    echo ''
+    manage_requests_menu
+  else
+    manageRequestArrayElement=$((${manageRequestSelection}-1))
+    selectedRequestTitle=$(jq .["${manageRequestArrayElement}"].title "${currentRequestsRawFile}" |tr -d '"')
+    selectedRequestID=$(jq .["${manageRequestArrayElement}"]._id "${currentRequestsRawFile}" |tr -d '"')
+    selectedRequestUser=$(jq .["${manageRequestArrayElement}"].username "${currentRequestsRawFile}" |tr -d '"')
+    selectedRequestDate=$(jq .["${manageRequestArrayElement}"].dateAdded "${currentRequestsRawFile}" |tr -d '"' |cut -c1-10)
+  fi
+}
+
 # Function to manage media requests
 manage_requests() {
   endpoint='requests'
+  curl -s --location --request GET "${userMBURL}${endpoint}" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" |jq . > "${currentRequestsRawFile}"
+  create_existing_requests_list
+  prompt_for_request_to_manage
+  requestStatusCode=$(.["${manageRequestArrayElement}"].status "${currentRequestsRawFile}")
+  if [ "${requestStatusCode}" = '0' ]; then
+    requestStatus="Pending"
+  elif [ "${requestStatusCode}" = '1' ]; then
+    requestStatus="Downloading"
+  elif [ "${requestStatusCode}" = '2' ]; then
+    requestStatus="Partially Filled"
+  elif [ "${requestStatusCode}" = '3' ]; then
+    requestStatus="Filled"
+  fi
+  echo 'Request information:'
+  echo ''
+  echo "Title: ${selectedRequestTitle}"
+  echo "Submitted By: ${selectedRequestUser}"
+  echo "Date Requested: ${selectedRequestDate}"
+  echo "Request Status: ${requestStatus}"
+  echo ''
+  echo 'What would you like to do with this request?'
+  echo ''
+  echo '1) Approve Request'
+  echo '2) Deny Request'
+  echo '3) Back to Manage Requests'
+  echo ''
+  read -r manageRequestOption
+  if ! [[ "${manageRequestOption}" =~ ^(1|2|3)$ ]]; then
+    echo -e "${red}You did not specify a valid option!${endColor}"
+    echo ''
+    manage_requests_menu
+  elif [ "${manageRequestOption}" = '1' ]; then
+    approveRequestStatusCode=$(curl -s -o "${approveRequestResponseFile}" -w "%{http_code}" --location --request POST "${userMBURL}${endpoint}/${selectedRequestID}" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}")
+    if [ "${approveRequestStatusCode}" = '200' ]; then
+      echo -e "${grn}Request has been successfully approved!${endColor}"
+      echo ''
+      manage_requests_menu
+    elif [ "${approveRequestStatusCode}" = '400' ]; then
+      echo -e "${red}There was an error while trying to approve the request!${endColor}"
+      echo ''
+      manage_requests_menu
+    fi
+  elif [ "${manageRequestOption}" = '2' ]; then
+    denyRequestStatusCode=$(curl -s -o "${denyRequestResponseFile}" -w "%{http_code}" --location --request DELETE "${userMBURL}${endpoint}/${selectedRequestID}" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}")
+    if [ "${denyRequestStatusCode}" = '200' ]; then
+      echo -e "${grn}Request has been successfully removed!${endColor}"
+      echo ''
+      manage_requests_menu
+    elif [ "${denyRequestStatusCode}" = '500' ]; then
+      echo -e "${red}There was an error while trying to delete the request!${endColor}"
+      echo ''
+      manage_requests_menu
+    fi
+  elif [ "${manageRequestOption}" = '3' ]; then
+    manage_requests_menu
+  fi
 }
 
 # Main function to run all functions
