@@ -695,6 +695,7 @@ requests_menu() {
   echo ''
   if ! [[ "${requestsMenuSelection}" =~ ^(1|2|3)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
+    echo ''
     requests_menu
   elif [ "${requestsMenuSelection}" = '1' ]; then
     submit_request_menu
@@ -702,6 +703,7 @@ requests_menu() {
     if [ "${isAdmin}" != 'true' ]; then
       echo -e "${red}You do not have permission to access this menu!${endColor}"
       sleep 3
+      echo ''
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
       manage_requests
@@ -737,8 +739,10 @@ submit_request_menu() {
   elif [ "${submitRequestMenuSelection}" = '3' ]; then
     requestType='music'
     echo -e "${red}Not setup yet!${endColor}"
+    echo ''
     submit_request_menu
   elif [ "${submitRequestMenuSelection}" = '4' ]; then
+    echo ''
     main_menu
   fi
 }
@@ -759,19 +763,23 @@ issues_menu() {
   echo ''
   if ! [[ "${issuesMenuSelection}" =~ ^(1|2|3)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
+    echo ''
     issues_menu
   elif [ "${issuesMenuSelection}" = '1' ]; then
     #add_issue_menu
     echo -e "${red}Not setup yet!${endColor}"
+    echo ''
     exit 0
   elif [ "${issuesMenuSelection}" = '2' ]; then
     if [ "${isAdmin}" != 'true' ]; then
       echo -e "${red}You do not have permission to access this menu!${endColor}"
       sleep 3
+      echo ''
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
       #manage_issues_menu
       echo -e "${red}Not setup yet!${endColor}"
+      echo ''
       exit 0
     fi
   elif [ "${issuesMenuSelection}" = '3' ]; then
@@ -795,6 +803,7 @@ playback_menu() {
   echo ''
   if ! [[ "${playbackMenuSelection}" =~ ^(1|2|3)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
+    echo ''
     playback_menu
   elif [ "${playbackMenuSelection}" = '1' ]; then
     playback_history
@@ -802,6 +811,7 @@ playback_menu() {
     if [ "${isAdmin}" != 'true' ]; then
       echo -e "${red}You do not have permission to access this menu!${endColor}"
       sleep 3
+      echo ''
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
       now_playing
@@ -841,18 +851,22 @@ search_menu() {
   echo ''
   if ! [[ "${searchMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
+    echo ''
     search_menu
   elif [ "${searchMenuSelection}" = '1' ]; then
     #search_show
     echo -e "${red}Not setup yet!${endColor}"
+    echo ''
     exit 0
   elif [ "${searchMenuSelection}" = '2' ]; then
     #search_movie
     echo -e "${red}Not setup yet!${endColor}"
+    echo ''
     exit 0
   elif [ "${searchMenuSelection}" = '3' ]; then
     #search_music
     echo -e "${red}Not setup yet!${endColor}"
+    echo ''
     exit 0
   elif [ "${searchMenuSelection}" = '4' ]; then
     main_menu
