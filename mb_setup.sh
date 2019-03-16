@@ -1894,10 +1894,11 @@ now_playing() {
         cat "${nowPlayingDataFile}"
       fi
     done
+    echo ''
+    playback_menu
   elif [[ "${numberOfCurrentStreams}" -le '0' ]]; then
     echo -e "${org}There are no active streams at this time.${endColor}"
     echo ''
-    sleep 3
     playback_menu
   fi
 }
@@ -1965,10 +1966,11 @@ playback_history() {
     done
     echo -e "${lblu}============================================================${endColor}" >> "${historyDataFile}"
     cat "${historyDataFile}"
+    echo ''
+    playback_menu
   elif [[ "${numberOfHistoryItems}" -le '0' ]]; then
     echo -e "${org}There is no playback history at this time.${endColor}"
     echo ''
-    sleep 3
     playback_menu
   fi
 }
