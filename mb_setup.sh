@@ -2017,11 +2017,17 @@ submit_requests() {
   read -r request
   echo ''
   convert_request_title
-  curl -s --location --request GET "${userMBURL}${requestType}?query=${convertedRequestTitle}" \
+  queryRequestStatusCode=$(curl -s -o "${requestResultsRawFile}" -w "%{http_code}" --location --request GET "${userMBURL}${requestType}?query=${convertedRequestTitle}" \
   -H "${mbClientID}" \
-  -H "Authorization: Bearer ${plexServerMBToken}" |jq . > "${requestResultsRawFile}"
-  create_request_results_list
-  prompt_for_request_selection
+  -H "Authorization: Bearer ${plexServerMBToken}")
+  if [ "${queryRequestStatusCode}" = '200' ]; then
+    create_request_results_list
+    prompt_for_request_selection
+  elif [ "${queryRequestStatusCode}" = '500' ]; then
+    echo -e "${red}Your search yielded no results!${endColor}"
+    echo ''
+    submit_request_menu
+  fi
   mediaID=$(jq .results["${requestsResultsArrayElement}"].id "${requestResultsRawFile}")
   echo 'Submitting your request...'
   echo ''
