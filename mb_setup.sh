@@ -180,6 +180,7 @@ check_curl() {
   whichCURL=$(which curl)
   if [ -z "${whichCURL}" ]; then
     echo -e "${red}We tried, and failed, to install cURL!${endColor}"
+    $(clear >&2)
     exit 1
   else
     :
@@ -201,6 +202,7 @@ check_jq() {
   whichJQ=$(which jq)
   if [ -z "${whichJQ}" ]; then
     echo -e "${red}We tried, and failed, to install JQ!${endColor}"
+    $(clear >&2)
     exit 1
   else
     :
@@ -250,7 +252,8 @@ control_c() {
   elif [ "${endpoint}" = 'tautulli' ]; then
     reset_tautulli
   fi
-  exit
+  $(clear >&2)
+  exit 0
 }
 trap 'control_c' 2
 
@@ -345,9 +348,11 @@ reset(){
     reset_radarr3d
     reset_tautulli
     cleanup
+    $(clear >&2)
     exit 0
   elif [[ "${resetConfirmation}" =~ ^(no|n|No|N)$ ]]; then
-    endpoint_menu
+    $(clear >&2)
+    main_menu
   fi
 }
 
@@ -375,6 +380,7 @@ get_plex_creds() {
   else
     echo 'You provided an invalid option, please try again.'
     reset_plex
+    $(clear >&2)
     exit 1
   fi
 }
@@ -555,6 +561,7 @@ prompt_for_plex_server() {
         echo -e "${red}The version of the API that you're running appears to be out of date!${endColor}"
         echo -e "${org}Please update your MediaButler installation before continuing.${endColor}"
         reset_plex
+        $(clear >&2)
         exit 0
       fi
     done
@@ -598,9 +605,11 @@ exit_menu() {
     echo ''
     exit_menu
   elif [[ "${exitPrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
+    $(clear >&2)
     exit 0
   elif [[ "${exitPrompt}" =~ ^(no|n|No|N)$ ]]; then
-    endpoint_menu
+    $(clear >&2)
+    main_menu
   fi
 }
 
@@ -639,7 +648,7 @@ main_menu() {
   elif [ "${mainMenuSelection}" = '1' ]; then
     if [ "${isAdmin}" != 'true' ]; then
       echo -e "${red}You do not have permission to access this menu!${endColor}"
-      sleep 3
+      $(clear >&2)
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
       endpoint_menu
@@ -684,13 +693,13 @@ requests_menu() {
   elif [ "${requestsMenuSelection}" = '2' ]; then
     if [ "${isAdmin}" != 'true' ]; then
       echo -e "${red}You do not have permission to access this menu!${endColor}"
-      sleep 3
-      echo ''
+      $(clear >&2)
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
       manage_requests
     fi
   elif [ "${requestsMenuSelection}" = '3' ]; then
+    $(clear >&2)
     main_menu
   fi
 }
@@ -724,7 +733,7 @@ submit_request_menu() {
     echo ''
     submit_request_menu
   elif [ "${submitRequestMenuSelection}" = '4' ]; then
-    echo ''
+    $(clear >&2)
     main_menu
   fi
 }
@@ -750,21 +759,22 @@ issues_menu() {
   elif [ "${issuesMenuSelection}" = '1' ]; then
     #add_issue_menu
     echo -e "${red}Not setup yet!${endColor}"
-    echo ''
-    exit 0
+    $(clear >&2)
+    main_menu
   elif [ "${issuesMenuSelection}" = '2' ]; then
     if [ "${isAdmin}" != 'true' ]; then
       echo -e "${red}You do not have permission to access this menu!${endColor}"
       sleep 3
-      echo ''
+      $(clear >&2)
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
       #manage_issues_menu
       echo -e "${red}Not setup yet!${endColor}"
-      echo ''
-      exit 0
+      $(clear >&2)
+      main_menu
     fi
   elif [ "${issuesMenuSelection}" = '3' ]; then
+    $(clear >&2)
     main_menu
   fi
 }
@@ -794,11 +804,13 @@ playback_menu() {
       echo -e "${red}You do not have permission to access this menu!${endColor}"
       sleep 3
       echo ''
+      $(clear >&2)
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
       now_playing
     fi
   elif [ "${playbackMenuSelection}" = '3' ]; then
+    $(clear >&2)
     main_menu
   fi
 }
@@ -839,18 +851,22 @@ search_menu() {
     #search_show
     echo -e "${red}Not setup yet!${endColor}"
     echo ''
-    exit 0
+    $(clear >&2)
+    main_menu
   elif [ "${searchMenuSelection}" = '2' ]; then
     #search_movie
     echo -e "${red}Not setup yet!${endColor}"
     echo ''
-    exit 0
+    $(clear >&2)
+    main_menu
   elif [ "${searchMenuSelection}" = '3' ]; then
     #search_music
     echo -e "${red}Not setup yet!${endColor}"
     echo ''
-    exit 0
+    $(clear >&2)
+    main_menu
   elif [ "${searchMenuSelection}" = '4' ]; then
+    $(clear >&2)
     main_menu
   fi
 }
@@ -896,6 +912,7 @@ endpoint_menu(){
   elif [ "${endpointMenuSelection}" = '3' ]; then
     setup_tautulli
   elif [ "${endpointMenuSelection}" = '4' ]; then
+    $(clear >&2)
     main_menu
   fi
 }
@@ -1093,7 +1110,6 @@ setup_sonarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Sonarr URL is valid...'
-    #echo ''
     convert_url
     set +e
     sonarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -1123,7 +1139,6 @@ setup_sonarr() {
     read -rs sonarrAPIKey
     echo ''
     echo 'Testing that the provided Sonarr API Key is valid...'
-    #echo ''
     sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" |jq .[] |tr -d '"')
     while [ "${sonarrAPIKeyStatus}" = 'invalid' ]; do
       if [ "${sonarrAPITestResponse}" = 'Unauthorized' ]; then
@@ -1167,15 +1182,18 @@ setup_sonarr() {
         sleep 3
         echo ''
         echo 'Returning you to the Main Menu...'
+        $(clear >&2)
         endpoint_menu
       elif [ "${sonarrMBConfigPostResponse}" != 'success' ]; then
         echo -e "${red}Config push failed! Please try again later.${endColor}"
         sleep 3
+        $(clear >&2)
         endpoint_menu
       fi
     elif [ "${sonarrMBConfigTestResponse}" != 'success' ]; then
       echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
       sleep 3
+      $(clear >&2)
       endpoint_menu
     fi
   elif [ "${sonarrMenuSelection}" = '2' ]; then
@@ -1210,7 +1228,6 @@ setup_sonarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Sonarr 4K URL is valid...'
-    #echo ''
     convert_url
     set +e
     sonarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -1240,7 +1257,6 @@ setup_sonarr() {
     read -rs sonarr4kAPIKey
     echo ''
     echo 'Testing that the provided Sonarr 4K API Key is valid...'
-    #echo ''
     sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" |jq .[] |tr -d '"')
     while [ "${sonarr4kAPIKeyStatus}" = 'invalid' ]; do
       if [ "${sonarr4kAPITestResponse}" = 'Unauthorized' ]; then
@@ -1284,15 +1300,18 @@ setup_sonarr() {
         sleep 3
         echo ''
         echo 'Returning you to the Main Menu...'
+        $(clear >&2)
         endpoint_menu
       elif [ "${sonarr4kMBConfigPostResponse}" != 'success' ]; then
         echo -e "${red}Config push failed! Please try again later.${endColor}"
         sleep 3
+        $(clear >&2)
         endpoint_menu
       fi
     elif [ "${sonarr4kMBConfigTestResponse}" != 'success' ]; then
       echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
       sleep 3
+      $(clear >&2)
       endpoint_menu
     fi
   fi
@@ -1332,7 +1351,6 @@ setup_radarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Radarr URL is valid...'
-    #echo ''
     convert_url
     set +e
     radarrURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -1362,7 +1380,6 @@ setup_radarr() {
     read -rs radarrAPIKey
     echo ''
     echo 'Testing that the provided Radarr API Key is valid...'
-    #echo ''
     radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" |jq .[] |tr -d '"')
     while [ "${radarrAPIKeyStatus}" = 'invalid' ]; do
       if [ "${radarrAPITestResponse}" = 'Unauthorized' ]; then
@@ -1406,15 +1423,18 @@ setup_radarr() {
         sleep 3
         echo ''
         echo 'Returning you to the Main Menu...'
+        $(clear >&2)
         endpoint_menu
       elif [ "${radarrMBConfigPostResponse}" != 'success' ]; then
         echo -e "${red}Config push failed! Please try again later.${endColor}"
         sleep 3
+        $(clear >&2)
         endpoint_menu
       fi
     elif [ "${radarrMBConfigTestResponse}" != 'success' ]; then
       echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
       sleep 3
+      $(clear >&2)
       endpoint_menu
     fi
   elif [ "${radarrMenuSelection}" = '2' ]; then
@@ -1449,7 +1469,6 @@ setup_radarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Radarr 4K URL is valid...'
-    #echo ''
     convert_url
     set +e
     radarr4kURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -1479,7 +1498,6 @@ setup_radarr() {
     read -rs radarr4kAPIKey
     echo ''
     echo 'Testing that the provided Radarr 4K API Key is valid...'
-    #echo ''
     radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" |jq .[] |tr -d '"')
     while [ "${radarr4kAPIKeyStatus}" = 'invalid' ]; do
       if [ "${radarr4kAPITestResponse}" = 'Unauthorized' ]; then
@@ -1523,15 +1541,18 @@ setup_radarr() {
         sleep 3
         echo ''
         echo 'Returning you to the Main Menu...'
+        $(clear >&2)
         endpoint_menu
       elif [ "${radarr4kMBConfigPostResponse}" != 'success' ]; then
         echo -e "${red}Config push failed! Please try again later.${endColor}"
         sleep 3
+        $(clear >&2)
         endpoint_menu
       fi
     elif [ "${radarr4kMBConfigTestResponse}" != 'success' ]; then
       echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
       sleep 3
+      $(clear >&2)
       endpoint_menu
     fi
   elif [ "${radarrMenuSelection}" = '3' ]; then
@@ -1566,7 +1587,6 @@ setup_radarr() {
     read -r providedURL
     echo ''
     echo 'Checking that the provided Radarr 3D URL is valid...'
-    #echo ''
     convert_url
     set +e
     radarr3dURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}")
@@ -1639,16 +1659,19 @@ setup_radarr() {
         echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
         sleep 3
         echo ''
-        echo 'Returning you to the Main Menu...'
+        echo 'Returning you to the Endpoint Configuration Menu...'
+        $(clear >&2)
         endpoint_menu
       elif [ "${radarr3dMBConfigPostResponse}" != 'success' ]; then
         echo -e "${red}Config push failed! Please try again later.${endColor}"
         sleep 3
+        $(clear >&2)
         endpoint_menu
       fi
     elif [ "${radarr3dMBConfigTestResponse}" != 'success' ]; then
       echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
       sleep 3
+      $(clear >&2)
       endpoint_menu
     fi
   fi
@@ -1687,7 +1710,6 @@ setup_tautulli() {
   read -r providedURL
   echo ''
   echo 'Checking that the provided Tautulli URL is valid...'
-  #echo ''
   convert_url
   set +e
   tautulliURLCheckResponse=$(curl --head --write-out "%{http_code}" -sI --output /dev/null --connect-timeout 10 "${convertedURL}"auth/login)
@@ -1717,7 +1739,6 @@ setup_tautulli() {
   read -rs tautulliAPIKey
   echo ''
   echo 'Testing that the provided Tautulli API Key is valid...'
-  #echo ''
   tautulliAPITestResponse=$(curl -s "${convertedURL}api/v2?apikey=${tautulliAPIKey}&cmd=arnold" |jq .response.message |tr -d '"')
   while [ "${tautulliAPIKeyStatus}" = 'invalid' ]; do
     if [ "${tautulliAPITestResponse}" = 'null' ]; then
@@ -1755,16 +1776,19 @@ setup_tautulli() {
       echo -e "${grn}MediaButler with the ${selectedPlexServerName} Plex server.${endColor}"
       sleep 3
       echo ''
-      echo 'Returning you to the Main Menu...'
+      echo 'Returning you to the Endpoint Configuration Menu...'
+      $(clear >&2)
       endpoint_menu
     elif [ "${tautulliMBConfigPostResponse}" != 'success' ]; then
       echo -e "${red}Config push failed! Please try again later.${endColor}"
       sleep 3
+      $(clear >&2)
       endpoint_menu
     fi
   elif [ "${tautulliMBConfigTestResponse}" != 'success' ]; then
     echo -e "${red}Hmm, something weird happened. Please try again.${endColor}"
     sleep 3
+    $(clear >&2)
     endpoint_menu
   fi
 }
@@ -2180,6 +2204,7 @@ main() {
     :
   fi
   create_env_file
+  $(clear >&2)
   main_menu
 }
 
