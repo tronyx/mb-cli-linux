@@ -586,26 +586,6 @@ create_env_file() {
   jq '. | split("\n") | map( split("\t") | {name: .[0], value: .[1]} ) | {data: .} ' -R -s "${envFile}" > "${jsonEnvFile}"
 }
 
-# Function to check if endpoints are already configured
-#check_endpoints() {
-#  mbEndpoints=(tautulli sonarr sonarr4k radarr radarr4k radarr3d)
-#  for endpoint in "${mbEndpoints[@]}"; do
-#    endpointStatus=$(curl -s --location --request GET "${userMBURL}configure/${endpoint}?" \
-#    -H 'Content-Type: application/x-www-form-urlencoded' \
-#    -H "${mbClientID}" \
-#    -H "Authorization: Bearer ${plexServerMBToken}" |jq .settings)
-#    checkURLStatusVar=${endpoint}'URLStatus'
-#    checkAPIStatusVar=${endpoint}'APIStatus'
-#    endpointConfiguredVar=${endpoint}'Configured'
-#    if [[ "${!checkURLStatusVar}" = 'ok' ]] && [[ "${!checkAPIStatusVar}" = 'ok' ]] && [[ "${endpointStatus}" != '{}' ]]; then
-#      declare -g "$(echo "${endpointConfiguredVar}")"='true'
-#    elif [[ "${!checkURLStatusVar}" = 'invalid' ]] || [[ "${!checkAPIStatusVar}" = 'invalid' ]] || [[ "${endpointStatus}" = '{}' ]]; then
-#      declare -g "$(echo "${endpointConfiguredVar}")"='false'
-#    fi
-#    endpointURL="configure/${endpoint}"
-#  done
-#}
-
 # Function to exit the menu
 exit_menu() {
   echo -e "${red}This will exit the program and any unfinished config setup will be lost!${endColor}"
@@ -1109,24 +1089,6 @@ setup_sonarr() {
     elif [[ "${sonarrURLStatus}" = 'invalid' ]] || [[ "${sonarrAPIKeyStatus}" = 'invalid' ]]; then
       :
     fi
-    #if [ "${sonarrConfigured}" = 'true' ]; then
-    #  echo -e "${red}Sonarr appears to be setup already!${endColor}"
-    #  echo -e "${ylw}Do you wish to continue?${endColor}"
-    #  echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
-    #  read -r continuePrompt
-    #  if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
-    #    echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-    #  elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
-    #    sed -i.bak "${sonarrURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
-    #    sonarrURLStatus='invalid'
-    #    sed -i.bak "${sonarrAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
-    #    sonarrAPIKeyStatus='invalid'
-    #  elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
-    #    sonarr_menu
-    #  fi
-    #elif [ "${sonarrConfigured}" = 'false' ]; then
-    #  :
-    #fi
     echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
     read -r providedURL
     echo ''
