@@ -835,7 +835,7 @@ search_menu() {
   echo -e "${bold}*****************************************${endColor}"
   echo -e "${bold}*             ~Search Menu~             *${endColor}"
   echo -e "${bold}*****************************************${endColor}"
-  echo 'Please select from the following options:'
+  echo 'Please select the Plex library you would like to search:'
   echo ''
   echo -e "${bold}1)${endColor} TV Show"
   echo -e "${bold}2)${endColor} Movie"
