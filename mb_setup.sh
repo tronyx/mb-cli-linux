@@ -1989,7 +1989,7 @@ convert_request_title() {
 # Function to prompt user for desired request
 prompt_for_request_selection() {
   numberOfOptions=$(echo "${#requestsResults[@]}")
-  cancelOption=$((${numberOfOptions}+1))
+  cancelOption=$((numberOfOptions+1))
   echo 'Here are your results:'
   echo ''
   cat "${numberedRequestsResultsFile}"
@@ -2077,7 +2077,7 @@ create_existing_requests_list() {
 # Function to prompt user for request to manage
 prompt_for_request_to_manage() {
   numberOfOptions=$(echo "${#currentRequests[@]}")
-  cancelOption=$((${numberOfOptions}+1))
+  cancelOption=$((numberOfOptions+1))
   echo 'Here are the current requests:'
   echo ''
   cat "${numberedCurrentRequestsFile}"
