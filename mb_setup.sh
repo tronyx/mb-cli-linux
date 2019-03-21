@@ -826,7 +826,7 @@ library_menu() {
   echo -e "${bold}*****************************************${endColor}"
   echo -e "${bold}*         ~Plex Libraries Menu~         *${endColor}"
   echo -e "${bold}*****************************************${endColor}"
-  echo 'Please select from the following options"'
+  echo 'Please select from the following options:'
   echo ''
 }
 
@@ -835,27 +835,28 @@ search_menu() {
   echo -e "${bold}*****************************************${endColor}"
   echo -e "${bold}*             ~Search Menu~             *${endColor}"
   echo -e "${bold}*****************************************${endColor}"
-  echo 'Please select the Plex library you would like to search:'
+  echo 'Please select the category you would like to search:'
   echo ''
-  echo -e "${bold}1)${endColor} TV Show"
-  echo -e "${bold}2)${endColor} Movie"
+  echo -e "${bold}1)${endColor} TV Shows"
+  echo -e "${bold}2)${endColor} Movies"
   echo -e "${bold}3)${endColor} Music"
-  echo -e "${bold}4)${endColor} Back to Main Menu"
+  echo -e "${bold}4)${endColor} Everything"
+  echo -e "${bold}5)${endColor} Back to Main Menu"
   echo ''
   read -rp 'Selection: ' searchMenuSelection
   echo ''
-  if ! [[ "${searchMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
+  if ! [[ "${searchMenuSelection}" =~ ^(1|2|3|4|5)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
     echo ''
     search_menu
   elif [ "${searchMenuSelection}" = '1' ]; then
-    #search_show
+    #search_shows
     echo -e "${red}Not setup yet!${endColor}"
     echo ''
     clear >&2
     main_menu
   elif [ "${searchMenuSelection}" = '2' ]; then
-    #search_movie
+    #search_movies
     echo -e "${red}Not setup yet!${endColor}"
     echo ''
     clear >&2
@@ -867,6 +868,12 @@ search_menu() {
     clear >&2
     main_menu
   elif [ "${searchMenuSelection}" = '4' ]; then
+    #search_all
+    echo -e "${red}Not setup yet!${endColor}"
+    echo ''
+    clear >&2
+    main_menu
+  elif [ "${searchMenuSelection}" = '5' ]; then
     clear >&2
     main_menu
   fi
