@@ -570,15 +570,23 @@ prompt_for_plex_server() {
 
 # Function to determine whether user has admin permissions to the selected Plex Server
 check_admin() {
-  curl -s --location --request GET "${userMBURL}user/@me/" \
+  adminCheckContentResponse=$(curl -s -o "${adminCheckFile}" --write-out "%{content_type}" --location --request GET "${userMBURL}user/@me/" \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -H "${mbClientID}" \
-  -H "Authorization: Bearer ${plexServerMBToken}" |jq .permissions > "${adminCheckFile}"
-  adminCheckResponse=$(grep -i admin "${adminCheckFile}" |awk '{print $1}' |tr -d '"')
-  if [ "${adminCheckResponse}" = 'ADMIN' ]; then
-    isAdmin='true'
-  elif [ "${adminCheckResponse}" != 'ADMIN' ]; then
-    isAdmin='false'
+  -H "Authorization: Bearer ${plexServerMBToken}")
+  if [[ "${adminCheckContentResponse}" =~ 'json' ]]; then
+    adminCheckResponse=$(grep -i admin "${adminCheckFile}" |awk '{print $1}' |tr -d '"')
+    if [ "${adminCheckResponse}" = 'ADMIN' ]; then
+      isAdmin='true'
+    elif [ "${adminCheckResponse}" != 'ADMIN' ]; then
+      isAdmin='false'
+    fi
+  elif [[ "${adminCheckContentResponse}" != *'json'* ]]; then
+    echo -e "${red}There was an issue checking your permissions for the selected Plex Server!${endColor}"
+    echo -e "${ylw}Please make sure your MediaButler API is functioning properly and try again.${endColor}"
+    reset_plex
+    clear >&2
+    exit 0
   fi
 }
 
