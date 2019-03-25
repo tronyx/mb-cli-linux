@@ -407,8 +407,9 @@ get_plex_creds() {
     read -rs plexToken
     echo ''
   elif [ "${plexCredsOption}" == '3' ]; then
-    exit 0
+    reset_plex
     clear >&2
+    exit 0
   fi
 }
 
@@ -512,6 +513,7 @@ prompt_for_plex_server() {
       echo -e "${red}You did not specify a valid option!${endColor}"
       reset_plex
     elif [ "${plexServerSelection}" = "${cancelOption}" ]; then
+      reset_plex
       echo ''
       exit 0
     else
