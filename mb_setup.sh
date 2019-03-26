@@ -526,10 +526,15 @@ prompt_for_plex_server() {
   plexServerArrayElement=$((plexServerSelection-1))
   selectedPlexServerName=$(jq .servers["${plexServerArrayElement}"].name "${plexCredsFile}" |tr -d '"')
   plexServerMachineID=$(jq .servers["${plexServerArrayElement}"].machineId "${plexCredsFile}" |tr -d '"')
-  userMBURL=$(curl -s -L -X POST "${mbDiscoverURL}" \
+  #userMBURL=$(curl -s -L -X POST "${mbDiscoverURL}" \
+  #  -H "Content-Type: application/x-www-form-urlencoded" \
+  #  -H "${mbClientID}" \
+  #  --data "authToken=${plexToken}&machineId=${plexServerMachineID}")
+  userMBURL=$(curl -s -L -X GET "${mbDiscoverURL}" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -H "${mbClientID}" \
-    --data "authToken=${plexToken}&machineId=${plexServerMachineID}")
+    -H "MB-Plex-Token: ${plexToken}" \
+    -H "MB-Machine-Identifier: ${plexServerMachineID}")
   if [[ "${userMBURL}" != *'Error'* ]]; then
     :
   elif [[ "${userMBURL}" =~ 'Error' ]]; then
