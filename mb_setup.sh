@@ -41,6 +41,7 @@ radarr3dAPIKeyStatus='invalid'
 # Define temp directory and files
 tempDir='/tmp/mb_setup/'
 spacePattern="( |\')"
+integerPattern='^[0-9]+$'
 plexCredsFile="${tempDir}plex_creds_check.txt"
 plexServersOwnerFile="${tempDir}plex_server_owners.txt"
 plexServersFriendsFile="${tempDir}plex_server_friends.txt"
@@ -88,6 +89,14 @@ albumSearchResultsRawFile="${tempDir}album_search_results_raw.txt"
 albumSearchResults="${tempDir}album_search_results.txt"
 songSearchResultsRawFile="${tempDir}song_search_results_raw.txt"
 songSearchResults="${tempDir}song_search_results.txt"
+rawUsersFile="${tempDir}users_raw.txt"
+usernamesFile="${tempDir}usernames.txt"
+numberedUsersListFile="${tempDir}numbered_usernames_list.txt"
+rawUserDataFile="${tempDir}user_data_raw.txt"
+mbPermsListFile="${tempDir}mb_perms_list.txt"
+numberedMBPermsListFile="${tempDir}numbered_mb_perms_list.txt"
+userPermsListFile="${tempDir}user_perms_list.txt"
+numberedUserPermsListFile="${tempDir}numbered_user_perms_list.txt"
 
 # Define text colors
 readonly blu='\e[34m'
@@ -350,10 +359,11 @@ reset(){
   echo ''
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r resetConfirmation
+  resetConfirmation=$(echo "${resetConfirmation}" | awk '{print tolower($0)}')
   echo ''
-  if ! [[ "${resetConfirmation}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
+  if ! [[ "${resetConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-  elif [[ "${resetConfirmation}" =~ ^(yes|y|Yes|Y)$ ]]; then
+  elif [[ "${resetConfirmation}" =~ ^(yes|y)$ ]]; then
     reset_plex
     reset_sonarr
     reset_sonarr4k
@@ -369,7 +379,7 @@ reset(){
     sleep 3
     clear >&2
     exit 0
-  elif [[ "${resetConfirmation}" =~ ^(no|n|No|N)$ ]]; then
+  elif [[ "${resetConfirmation}" =~ ^(no|n)$ ]]; then
     clear >&2
     main_menu
   fi
@@ -548,13 +558,14 @@ prompt_for_plex_server() {
   echo ''
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r mbURLConfirmation
+  mbURLConfirmation=$(echo "${mbURLConfirmation}" | awk '{print tolower($0)}')
   echo ''
-  if ! [[ "${mbURLConfirmation}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
+  if ! [[ "${mbURLConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-  elif [[ "${mbURLConfirmation}" =~ ^(yes|y|Yes|Y)$ ]]; then
+  elif [[ "${mbURLConfirmation}" =~ ^(yes|y)$ ]]; then
     sed -i.bak "${mbURLStatusLineNum} s/mbURLStatus='[^']*'/mbURLStatus='ok'/" "${scriptname}"
     mbURLStatus='ok'
-  elif [[ "${mbURLConfirmation}" =~ ^(no|n|No|N)$ ]]; then
+  elif [[ "${mbURLConfirmation}" =~ ^(no|n)$ ]]; then
     echo 'Please enter the correct MediaButler URL:'
     read -r providedURL
     echo ''
@@ -666,14 +677,15 @@ exit_menu() {
   echo ''
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r exitPrompt
-  if ! [[ "${exitPrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
+  exitPrompt=$(echo "${exitPrompt}" | awk '{print tolower($0)}')
+  if ! [[ "${exitPrompt}" =~ ^(yes|y|no|n)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
     echo ''
     exit_menu
-  elif [[ "${exitPrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
+  elif [[ "${exitPrompt}" =~ ^(yes|y)$ ]]; then
     clear >&2
     exit 0
-  elif [[ "${exitPrompt}" =~ ^(no|n|No|N)$ ]]; then
+  elif [[ "${exitPrompt}" =~ ^(no|n)$ ]]; then
     clear >&2
     main_menu
   fi
@@ -698,17 +710,18 @@ main_menu() {
   echo -e "        (${red}*${endColor} indicates Admin only)         "
   echo ''
   echo -e "${bold}  1)${endColor} Configure Applications${red}*${endColor}"
-  echo -e "${bold}  2)${endColor} Plex Media Requests"
-  echo -e "${bold}  3)${endColor} Plex Media Issues"
-  echo -e "${bold}  4)${endColor} Plex Playback Information"
-  echo -e "${bold}  5)${endColor} Plex Library Information"
-  echo -e "${bold}  6)${endColor} Plex Media Search"
-  echo -e "${bold}  7)${endColor} Reset Configuration"
-  echo -e "${bold}  8)${endColor} Exit"
+  echo -e "${bold}  2)${endColor} Configure Permissions${red}*${endColor}"
+  echo -e "${bold}  3)${endColor} Plex Media Requests"
+  echo -e "${bold}  4)${endColor} Plex Media Issues"
+  echo -e "${bold}  5)${endColor} Plex Playback Information"
+  echo -e "${bold}  6)${endColor} Plex Library Information"
+  echo -e "${bold}  7)${endColor} Plex Media Search"
+  echo -e "${bold}  8)${endColor} Reset Configuration"
+  echo -e "${bold}  9)${endColor} Exit"
   echo ''
   read -rp 'Selection: ' mainMenuSelection
   echo ''
-  if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5|6|7|8)$ ]]; then
+  if ! [[ "${mainMenuSelection}" =~ ^(1|2|3|4|5|6|7|8|9)$ ]]; then
     echo -e "${red}You did not specify a valid option!${endColor}"
     main_menu
   elif [ "${mainMenuSelection}" = '1' ]; then
@@ -721,18 +734,27 @@ main_menu() {
       endpoint_menu
     fi
   elif [ "${mainMenuSelection}" = '2' ]; then
-    requests_menu
+    if [ "${isAdmin}" != 'true' ]; then
+      echo -e "${red}You do not have permission to access this menu!${endColor}"
+      sleep 3
+      clear >&2
+      main_menu
+    elif [ "${isAdmin}" = 'true' ]; then
+      permissions_menu
+    fi
   elif [ "${mainMenuSelection}" = '3' ]; then
-    issues_menu
+    requests_menu
   elif [ "${mainMenuSelection}" = '4' ]; then
-    playback_menu
+    issues_menu
   elif [ "${mainMenuSelection}" = '5' ]; then
-    library_menu
+    playback_menu
   elif [ "${mainMenuSelection}" = '6' ]; then
-    search_menu
+    library_menu
   elif [ "${mainMenuSelection}" = '7' ]; then
-    reset
+    search_menu
   elif [ "${mainMenuSelection}" = '8' ]; then
+    reset
+  elif [ "${mainMenuSelection}" = '9' ]; then
     exit_menu
   fi
 }
@@ -964,7 +986,8 @@ endpoint_menu(){
   else
     echo -e "${bold}  3)${endColor} ${red}Tautulli${endColor}"
   fi
-  echo -e "${bold}  4)${endColor} Back to Main Menu"
+  echo -e "${bold}  4)${endColor} Requests"
+  echo -e "${bold}  5)${endColor} Back to Main Menu"
   echo ''
   read -rp 'Selection: ' endpointMenuSelection
   echo ''
@@ -978,6 +1001,8 @@ endpoint_menu(){
   elif [ "${endpointMenuSelection}" = '3' ]; then
     setup_tautulli
   elif [ "${endpointMenuSelection}" = '4' ]; then
+    configure_request_limits
+  elif [ "${endpointMenuSelection}" = '5' ]; then
     clear >&2
     main_menu
   fi
@@ -1049,6 +1074,30 @@ radarr_menu() {
     setup_radarr
   elif [ "${radarrMenuSelection}" = '4' ]; then
     endpoint_menu
+  fi
+}
+
+# Function to display manage permissions menu
+permissions_menu() {
+  echo -e "${bold}+---------------------------------------+${endColor}"
+  echo -e "${bold}|       ~Manage Permissions Menu~       |${endColor}"
+  echo -e "${bold}+---------------------------------------+${endColor}"
+  echo 'Please select from the following options:'
+  echo ''
+  echo -e "${bold}  1)${endColor} Add Permissions"
+  echo -e "${bold}  2)${endColor} Remove Permissions"
+  echo -e "${bold}  3)${endColor} Reset User"
+  echo -e "${bold}  4)${endColor} Back to Main Menu"
+  echo ''
+  read -rp 'Selection: ' permsMenuSelection
+  echo ''
+  if ! [[ "${permsMenuSelection}" =~ ^(1|2|3|4)$ ]]; then
+    echo -e "${red}You did not specify a valid option!${endColor}"
+    permissions_menu
+  elif [[ "${permsMenuSelection}" =~ ^(1|2|3)$ ]]; then
+    configure_perms
+  elif [ "${permsMenuSelection}" = '4' ]; then
+    main_menu
   fi
 }
 
@@ -1196,14 +1245,15 @@ setup_sonarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
+        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
           sed -i.bak "${sonarrURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           sonarrURLStatus='invalid'
           sed -i.bak "${sonarrAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           sonarrAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
           sonarr_menu
         fi
       elif [ "${sonarrSetupCheck}" = '{}' ]; then
@@ -1314,14 +1364,15 @@ setup_sonarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
+        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
           sed -i.bak "${sonarr4kURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           sonarr4kURLStatus='invalid'
           sed -i.bak "${sonarr4kAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           sonarr4kAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
           sonarr_menu
         fi
       elif [ "${sonarr4kSetupCheck}" = '{}' ]; then
@@ -1437,14 +1488,15 @@ setup_radarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
+        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
           sed -i.bak "${radarrURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           radarrURLStatus='invalid'
           sed -i.bak "${radarrAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           radarrAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
           radarr_menu
         fi
       elif [ "${radarrSetupCheck}" = '{}' ]; then
@@ -1555,14 +1607,15 @@ setup_radarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
+        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
           sed -i.bak "${radarr4kURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           radarr4kURLStatus='invalid'
           sed -i.bak "${radarr4kAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           radarr4kAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
           radarr4k_menu
         fi
       elif [ "${radarr4kSetupCheck}" = '{}' ]; then
@@ -1673,14 +1726,15 @@ setup_radarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
+        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-        elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
           sed -i.bak "${radarr3dURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
           radarr3dURLStatus='invalid'
           sed -i.bak "${radarr3dAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
           radarr3dAPIKeyStatus='invalid'
-        elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
+        elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
           radarr3d_menu
         fi
       elif [ "${radarr3dSetupCheck}" = '{}' ]; then
@@ -1796,14 +1850,15 @@ setup_tautulli() {
       echo -e "${ylw}Do you wish to continue?${endColor}"
       echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
       read -r continuePrompt
-      if ! [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y|no|n|No|N)$ ]]; then
+      continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+      if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
         echo -e "${red}Please specify yes, y, no, or n.${endColor}"
-      elif [[ "${continuePrompt}" =~ ^(yes|y|Yes|Y)$ ]]; then
+      elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
         sed -i.bak "${tautulliURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='invalid'/" "${scriptname}"
         tautulliURLStatus='invalid'
         sed -i.bak "${tautulliAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='invalid'/" "${scriptname}"
         tautulliAPIKeyStatus='invalid'
-      elif [[ "${continuePrompt}" =~ ^(no|n|No|N)$ ]]; then
+      elif [[ "${continuePrompt}" =~ ^(no|n)$ ]]; then
         endpoint_menu
       fi
     elif [ "${tautulliSetupCheck}" = '{}' ]; then
@@ -2455,6 +2510,145 @@ search_all() {
   search_artists
   search_albums
   search_songs
+}
+
+#  Function to configure the request limit cycle and amount
+configure_request_limits() {
+  endpoint='requests'
+  echo 'How many days would you like to set the limit cycle to?'
+  read -r limitCycle
+  echo ''
+  echo 'What would you like to set the request limit to?'
+  read -r limitAmount
+  echo ''
+  if ! [[ "${limitCycle}" =~ ${integerPattern} ]] || [[ "${limitAmount}" =~ ${integerPattern} ]]; then
+    echo -e "${red}You did not enter a valid number!${endColor}"
+    sleep 3
+    clear >&2
+    endpoint_menu
+  elif [[ "${limitCycle}" =~ ${integerPattern} ]] && [[ "${limitAmount}" =~ ${integerPattern} ]]; then
+    requestLimitCheckResponse=$(curl -L -X PUT "${userMBURL}configure/${endpoint}" \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}" \
+    --data "limitDays=${limitCycle}&limitAmount=${limitAmount}" |jq .message |tr -d '"')
+    if [ "${requestLimitCheckResponse}" = 'success' ]; then
+      echo 'Saving the new request limits to MediaButler...'
+      curl -L -X POST "${userMBURL}configure/${endpoint}" \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" \
+      --data "limitDays=${limitCycle}&limitAmount=${limitAmount}"
+      sleep 3
+      clear >&2
+      endpoint_menu
+    elif [ "${requestLimitCheckResponse}" != 'success' ]; then
+      echo -e "${red}There was an issue saving the new request limits!${endColor}"
+      echo -e "${ylw}Please try again later.${endColor}"
+      sleep 3
+      clear >&2
+      endpoint_menu
+    fi
+  fi
+}
+
+# Function to generate numbered list of MediaButler usernames
+create_mb_users_list() {
+  endpoint='user'
+  curl -L -X GET "${userMBURL}${endpoint}" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" \ |jq . > "${rawUsersFile}"
+  jq .[].username "${rawArrRootDirsFile}" |tr -d '"' > "${usernamesFile}"
+  usersList=''
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'usersList=($(cat "${usernamesFile}"))'
+  for ((i = 0; i < ${#usersList[@]}; ++i)); do
+    position=$(( i + 1 ))
+    echo -e "${bold}  $position)${endColor} ${usersList[$i]}"
+  done > "${numberedUsersListFile}"
+}
+
+# Function to prompt for which user to manage permissions for
+prompt_for_mb_user() {
+  numberOfOptions=$(echo "${#usersList[@]}")
+  cancelOption=$((numberOfOptions+1))
+  echo 'Which user would you like to manage permissions for?'
+  echo ''
+  cat "${numberedUsersListFile}"
+  echo -e "${bold}  ${cancelOption})${endColor} Cancel"
+  echo ''
+  read -p "User (1-${cancelOption}): " userSelection
+  echo ''
+  if [[ "${userSelection}" -lt '1' ]] || [[ "${userSelection}" -gt "${cancelOption}" ]]; then
+    echo -e "${red}You didn't not specify a valid option!${endColor}"
+    echo ''
+    permissions_menu
+  elif [ "${userSelection}" = "${cancelOption}" ]; then
+    echo ''
+    permissions_menu
+  else
+    userArrayElement=$((userSelection-1))
+    selectedUser=$(jq .["${userArrayElement}"].username "${rawUsersFile}" |tr -d '"')
+    jq .["${userArrayElement}"] "${rawUsersFile}" > "${rawUserDataFile}"
+  fi
+}
+
+# Function to create numbered list of possible MediaButler permissions
+create_mb_perms_list() {
+  endpoint='version'
+  curl -L -X GET "${userMBURL}${endpoint}" \
+  -H "${mbClientID}" \
+  -H "Authorization: Bearer ${plexServerMBToken}" \ |jq . > "${rawMBPermsListFile}"
+  jq .permissions[] |tr -d '"' > "${mbPermsListFile}"
+  mbPermsList=''
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'mbPermsList=($(cat "${mbPermsListFile}"))'
+  for ((i = 0; i < ${#mbPermsList[@]}; ++i)); do
+    position=$(( i + 1 ))
+    echo -e "${bold}  $position)${endColor} ${mbPermsList[$i]}"
+  done > "${numberedMBPermsListFile}"
+}
+
+# Function to create numbered list of user's current MediaButler permissions
+create_user_perms_list() {
+  endpoint='user'
+  jq .permissions[] rawUserDataFile |tr -d '"' > "${userPermsListFile}"
+  userPermsList=''
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'userPermsList=($(cat "${userPermsListFile}"))'
+  for ((i = 0; i < ${#userPermsList[@]}; ++i)); do
+    position=$(( i + 1 ))
+    echo -e "${bold}  $position)${endColor} ${userPermsList[$i]}"
+  done > "${numberedUserPermsListFile}"
+}
+
+# Function to modify user permissions
+configure_perms() {
+  create_mb_users_list
+  create_mb_perms_list
+  prompt_for_mb_user
+  if [ "${permsMenuSelection}" = '1' ]; then
+    numberOfOptions=$(echo "${#mbPermsList[@]}")
+    cancelOption=$((numberOfOptions+1))
+    echo 'Which permission would you like to add?'
+    echo ''
+    cat "${numberedMBPermsListFile}"
+    echo -e "${bold}  ${cancelOption})${endColor} Cancel"
+    echo ''
+    read -p "Permission (1-${cancelOption}): " permSelection
+    echo ''
+    if [[ "${permSelection}" -lt '1' ]] || [[ "${permSelection}" -gt "${cancelOption}" ]]; then
+      echo -e "${red}You didn't not specify a valid option!${endColor}"
+      echo ''
+      permissions_menu
+    elif [ "${permSelection}" = "${cancelOption}" ]; then
+      echo ''
+      permissions_menu
+    else
+      permArrayElement=$((permSelection-1))
+      selectedPerm=$(jq .["${permArrayElement}"] "${rawMBPermsListFile}" |tr -d '"')
+      
+    fi
+  elif [ "${permsMenuSelection}" = '2' ]; then
+    foo
+  elif [ "${permsMenuSelection}" = '3' ]; then
+    foo
+  fi
 }
 
 # Main function to run all functions
