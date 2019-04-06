@@ -144,7 +144,7 @@ root_check() {
 
 # Function to check if the installed version of Bash is >=4 and, if not, exit w/ message
 check_bash() {
-  bashMajorVersion=$(bash --version |head -1 | awk '{print $4}' | cut -c1)
+  bashMajorVersion=$(bash --version | head -1 | awk '{print $4}' | cut -c1)
   if [ "${bashMajorVersion}" -lt '4' ]; then
     echo -e "${red}This script requires Bash v4 or higher!${endColor}"
     echo -e "${ylw}Please upgrade Bash on this system and then try again.${endColor}"
@@ -156,9 +156,9 @@ check_bash() {
 # Function to check if the installed version of Sed is >= and, if not,  exit w/ message
 check_sed() {
   if [ "${packageManager}" = 'mac' ]; then
-    sedMajorVersion=$(gsed --version |head -1 | awk '{print $4}' | cut -c1)
+    sedMajorVersion=$(gsed --version | head -1 | awk '{print $4}' | cut -c1)
   else
-    sedMajorVersion=$(sed --version |head -1 | awk '{print $4}' | cut -c1)
+    sedMajorVersion=$(sed --version | head -1 | awk '{print $4}' | cut -c1)
   fi
   if [ "${sedMajorVersion}" -lt '4' ]; then
     echo -e "${red}This script requires Sed v4 or higher!${endColor}"
@@ -287,9 +287,9 @@ trap 'control_c' 2
 
 # Function to grab status variable line numbers
 get_line_numbers() {
-  plexCredsStatusLineNum=$(head -50 "${scriptname}" | grep -En -A1 'Set initial Plex credentials status' |tail -1 | awk -F- '{print $1}')
-  plexServerStatusLineNum=$(head -50 "${scriptname}" | grep -En -A1 'Set initial Plex server selection status' |tail -1 | awk -F- '{print $1}')
-  mbURLStatusLineNum=$(head -50 "${scriptname}" | grep -En -A1 'Set initial MediaButler URL status' |tail -1 | awk -F- '{print $1}')
+  plexCredsStatusLineNum=$(head -50 "${scriptname}" | grep -En -A1 'Set initial Plex credentials status' | tail -1 | awk -F- '{print $1}')
+  plexServerStatusLineNum=$(head -50 "${scriptname}" | grep -En -A1 'Set initial Plex server selection status' | tail -1 | awk -F- '{print $1}')
+  mbURLStatusLineNum=$(head -50 "${scriptname}" | grep -En -A1 'Set initial MediaButler URL status' | tail -1 | awk -F- '{print $1}')
   tautulliURLStatusLineNum=$(head -50 "${scriptname}" | grep -En -A2 'Set initial Tautulli credentials status' | grep URL | awk -F- '{print $1}')
   tautulliAPIKeyStatusLineNum=$(head -50 "${scriptname}" | grep -En -A2 'Set initial Tautulli credentials status' | grep API | awk -F- '{print $1}')
   sonarrURLStatusLineNum=$(head -50 "${scriptname}" | grep -En -A2 'Set initial Sonarr credentials status' | grep URL | awk -F- '{print $1}')
