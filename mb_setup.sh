@@ -2143,7 +2143,6 @@ create_request_results_list() {
 # Function to convert spaces in title to plus sign
 convert_search_string() {
   if [[ "${searchString}" =~ ${spacePattern} ]]; then
-    #convertedSearchString=$(echo "${searchString}" |sed 's/ /+/g')
     convertedSearchString=$(echo "${searchString// /+}")
   else
     :
@@ -2527,23 +2526,24 @@ configure_request_limits() {
   echo 'What would you like to set the request limit to?'
   read -r limitAmount
   echo ''
-  if ! [[ "${limitCycle}" =~ ${integerPattern} ]] || [[ "${limitAmount}" =~ ${integerPattern} ]]; then
+  if [[ ! "${limitCycle}" =~ ${integerPattern} ]] || [[ ! "${limitAmount}" =~ ${integerPattern} ]]; then
     echo -e "${red}You did not enter a valid number!${endColor}"
     echo ''
     sleep 3
     clear >&2
     endpoint_menu
   elif [[ "${limitCycle}" =~ ${integerPattern} ]] && [[ "${limitAmount}" =~ ${integerPattern} ]]; then
-    requestLimitCheckResponse=$(curl -L -X PUT "${userMBURL}configure/${endpoint}" \
+    requestLimitCheckResponse=$(curl -s -L -X PUT "${userMBURL}configure/${endpoint}" \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}" \
     --data "limitDays=${limitCycle}&limitAmount=${limitAmount}" |jq .message |tr -d '"')
     if [ "${requestLimitCheckResponse}" = 'success' ]; then
       echo 'Saving the new request limits to MediaButler...'
-      curl -L -X POST "${userMBURL}configure/${endpoint}" \
+      curl -s -L -X POST "${userMBURL}configure/${endpoint}" \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
-      --data "limitDays=${limitCycle}&limitAmount=${limitAmount}"
+      --data "limitDays=${limitCycle}&limitAmount=${limitAmount}" |jq
+      echo ''
       sleep 3
       clear >&2
       endpoint_menu
@@ -2643,7 +2643,6 @@ create_user_new_perms_list() {
     cat "${userPermsListFile}" > "${userNewPermsListFile}"
   elif [ "${permsMenuSelection}" = '2' ]; then
     set +e
-    #cat "${userPermsListFile}" |grep -v "${selectedPerm}" > "${userNewPermsListFile}"
     grep -v "${selectedPerm}" "${userPermsListFile}" > "${userNewPermsListFile}"
     set -e
   elif [ "${permsMenuSelection}" = '3' ]; then
