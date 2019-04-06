@@ -364,7 +364,8 @@ reset(){
   echo ''
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r resetConfirmation
-  resetConfirmation=$(echo "${resetConfirmation}" | awk '{print tolower($0)}')
+  #resetConfirmation=$(echo "${resetConfirmation}" | awk '{print tolower($0)}')
+  resetConfirmation="${resetConfirmation,,}"
   echo ''
   if ! [[ "${resetConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
@@ -563,7 +564,8 @@ prompt_for_plex_server() {
   echo ''
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r mbURLConfirmation
-  mbURLConfirmation=$(echo "${mbURLConfirmation}" | awk '{print tolower($0)}')
+  #mbURLConfirmation=$(echo "${mbURLConfirmation}" | awk '{print tolower($0)}')
+  mbURLConfirmation="${mbURLConfirmation,,}"
   echo ''
   if ! [[ "${mbURLConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
@@ -682,7 +684,8 @@ exit_menu() {
   echo ''
   echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
   read -r exitPrompt
-  exitPrompt=$(echo "${exitPrompt}" | awk '{print tolower($0)}')
+  #exitPrompt=$(echo "${exitPrompt}" | awk '{print tolower($0)}')
+  exitPrompt="${exitPrompt,,}"
   if ! [[ "${exitPrompt}" =~ ^(yes|y|no|n)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
     echo ''
@@ -745,7 +748,9 @@ main_menu() {
       clear >&2
       main_menu
     elif [ "${isAdmin}" = 'true' ]; then
-      permissions_menu
+      #permissions_menu
+      create_mb_users_list
+      prompt_for_mb_user
     fi
   elif [ "${mainMenuSelection}" = '3' ]; then
     requests_menu
@@ -1100,6 +1105,10 @@ permissions_menu() {
     echo -e "${red}You did not specify a valid option!${endColor}"
     permissions_menu
   elif [[ "${permsMenuSelection}" =~ ^(1|2|3)$ ]]; then
+    create_mb_users_list
+    create_mb_perms_list
+    create_user_existing_perms_list
+    create_numbered_user_possible_perms_list
     configure_perms
   elif [ "${permsMenuSelection}" = '4' ]; then
     main_menu
@@ -1250,7 +1259,7 @@ setup_sonarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        continuePrompt="${continuePrompt,,}"
         if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
         elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
@@ -1369,7 +1378,7 @@ setup_sonarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        continuePrompt="${continuePrompt,,}"
         if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
         elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
@@ -1493,7 +1502,7 @@ setup_radarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        continuePrompt="${continuePrompt,,}"
         if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
         elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
@@ -1612,7 +1621,7 @@ setup_radarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        continuePrompt="${continuePrompt,,}"
         if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
         elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
@@ -1731,7 +1740,7 @@ setup_radarr() {
         echo -e "${ylw}Do you wish to continue?${endColor}"
         echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
         read -r continuePrompt
-        continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+        continuePrompt="${continuePrompt,,}"
         if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
           echo -e "${red}Please specify yes, y, no, or n.${endColor}"
         elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
@@ -1855,7 +1864,7 @@ setup_tautulli() {
       echo -e "${ylw}Do you wish to continue?${endColor}"
       echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
       read -r continuePrompt
-      continuePrompt=$(echo "${continuePrompt}" | awk '{print tolower($0)}')
+      continuePrompt="${continuePrompt,,}"
       if ! [[ "${continuePrompt}" =~ ^(yes|y|no|n)$ ]]; then
         echo -e "${red}Please specify yes, y, no, or n.${endColor}"
       elif [[ "${continuePrompt}" =~ ^(yes|y)$ ]]; then
@@ -2586,14 +2595,15 @@ prompt_for_mb_user() {
   if [[ "${userSelection}" -lt '1' ]] || [[ "${userSelection}" -gt "${cancelOption}" ]]; then
     echo -e "${red}You didn't not specify a valid option!${endColor}"
     echo ''
-    permissions_menu
+    endpoint_menu
   elif [ "${userSelection}" = "${cancelOption}" ]; then
     echo ''
-    permissions_menu
+    endpoint_menu
   else
     userArrayElement=$((userSelection-1))
     selectedUser=$(jq .["${userArrayElement}"].username "${rawUsersFile}" |tr -d '"')
-    jq .["${userArrayElement}"] "${rawUsersFile}" > "${rawUserDataFile}"
+    #jq .["${userArrayElement}"] "${rawUsersFile}" > "${rawUserDataFile}"
+    permissions_menu
   fi
 }
 
@@ -2614,6 +2624,7 @@ create_mb_perms_list() {
 
 # Function to create numbered list of user's current MediaButler permissions
 create_user_existing_perms_list() {
+  jq .["${userArrayElement}"] "${rawUsersFile}" > "${rawUserDataFile}"
   jq .permissions[] "${rawUserDataFile}" |tr -d '"' > "${userPermsListFile}"
   userPermsList=''
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'userPermsList=($(cat "${userPermsListFile}"))'
@@ -2660,11 +2671,11 @@ create_user_new_perms_json() {
 
 # Function to modify user permissions
 configure_perms() {
-  create_mb_users_list
-  create_mb_perms_list
-  prompt_for_mb_user
-  create_user_existing_perms_list
-  create_numbered_user_possible_perms_list
+  #create_mb_users_list
+  #create_mb_perms_list
+  #prompt_for_mb_user
+  #create_user_existing_perms_list
+  #create_numbered_user_possible_perms_list
   if [ "${permsMenuSelection}" = '1' ]; then
     if [[ ! -s "${userPossiblePermsListFile}" ]]; then
       echo -e "${red}Selected user already has all available permissions!${endColor}"
@@ -2745,7 +2756,7 @@ configure_perms() {
     echo ''
     echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
     read -r userPermsResetConfirmation
-    userPermsResetConfirmation=$(echo "${userPermsResetConfirmation}" | awk '{print tolower($0)}')
+    userPermsResetConfirmation="${userPermsResetConfirmation,,}"
     echo ''
     if ! [[ "${userPermsResetConfirmation}" =~ ^(yes|y|no|n)$ ]]; then
       echo -e "${red}Please specify yes, y, no, or n.${endColor}"
