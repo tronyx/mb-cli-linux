@@ -2589,7 +2589,8 @@ prompt_for_mb_user() {
   cancelOption=$((numberOfOptions+1))
   echo 'Which user would you like to manage permissions for?'
   echo ''
-  cat "${numberedUsersListFile}" |column
+  #cat "${numberedUsersListFile}" |column
+  column "${numberedUsersListFile}"
   echo -e "${bold}  ${cancelOption})${endColor} Cancel"
   echo ''
   read -p "User (1-${cancelOption}): " userSelection
