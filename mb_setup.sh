@@ -1094,6 +1094,8 @@ permissions_menu() {
   echo -e "${bold}+---------------------------------------+${endColor}"
   echo 'Please select from the following options:'
   echo ''
+  echo -e "Currently selected user: ${ylw}${selectedUser}${endColor}"
+  echo ''
   echo -e "${bold}  1)${endColor} Add Permissions"
   echo -e "${bold}  2)${endColor} Remove Permissions"
   echo -e "${bold}  3)${endColor} Reset User"
@@ -2751,7 +2753,7 @@ configure_perms() {
       fi
     fi
   elif [ "${permsMenuSelection}" = '3' ]; then
-    echo -e "${red}**WARNING!!!** This will reset ALL permissions for the selected user!${endColor}"
+    echo -e "${red}**WARNING!!!** This will reset ALL permissions for the ${endColor}${ylw}${selectedUser}${endColor}${red}!${endColor}"
     echo -e "${ylw}Do you wish to continue?${endColor}"
     echo ''
     echo -e "${grn}[Y]${endColor}es or ${red}[N]${endColor}o:"
