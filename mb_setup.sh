@@ -2557,10 +2557,10 @@ configure_request_limits() {
 # Function to generate numbered list of MediaButler usernames
 create_mb_users_list() {
   endpoint='user'
-  curl -L -X GET "${userMBURL}${endpoint}" \
+  curl -s -L -X GET "${userMBURL}${endpoint}" \
   -H "${mbClientID}" \
-  -H "Authorization: Bearer ${plexServerMBToken}" \ |jq . > "${rawUsersFile}"
-  jq .[].username "${rawArrRootDirsFile}" |tr -d '"' > "${usernamesFile}"
+  -H "Authorization: Bearer ${plexServerMBToken}" |jq . > "${rawUsersFile}"
+  jq .[].username "${rawUsersFile}" |tr -d '"' > "${usernamesFile}"
   usersList=''
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'usersList=($(cat "${usernamesFile}"))'
   for ((i = 0; i < ${#usersList[@]}; ++i)); do
@@ -2597,9 +2597,9 @@ prompt_for_mb_user() {
 # Function to create numbered list of possible MediaButler permissions
 create_mb_perms_list() {
   endpoint='version'
-  curl -L -X GET "${userMBURL}${endpoint}" \
+  curl -s -L -X GET "${userMBURL}${endpoint}" \
   -H "${mbClientID}" \
-  -H "Authorization: Bearer ${plexServerMBToken}" \ |jq . > "${rawMBPermsListFile}"
+  -H "Authorization: Bearer ${plexServerMBToken}" |jq . > "${rawMBPermsListFile}"
   jq .permissions[] "${rawMBPermsListFile}" |tr -d '"' > "${mbPermsListFile}"
   mbPermsList=''
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'mbPermsList=($(cat "${mbPermsListFile}"))'
@@ -2622,7 +2622,9 @@ create_user_existing_perms_list() {
 
 # Function to create list of possible perms to add to the selected user
 create_numbered_user_possible_perms_list() {
+  set +e
   diff -u "${mbPermsListFile}" "${userPermsListFile}" |grep -E "^\+" |sed -E 's/^\+//' |grep -Ev "^\+" > "${userPossiblePermsListFile}"
+  set -e
   userPossiblePermsList=''
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'userPossiblePermsList=($(cat "${userPossiblePermsListFile}"))'
   for ((i = 0; i < ${#userPossiblePermsList[@]}; ++i)); do
