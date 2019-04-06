@@ -706,7 +706,8 @@ convert_url() {
   elif [[ "${providedURL: -1}" != '/' ]]; then
     convertedURL=$(providedURL+=\/; echo "${providedURL}")
   fi
-  JSONConvertedURL=$(echo "${providedURL}" |sed 's/:/%3A/g')
+  #JSONConvertedURL=$(echo "${providedURL}" |sed 's/:/%3A/g')
+  JSONConvertedURL="${providedURL//:/%3A}"
 }
 
 # Function to display the main menu
@@ -2671,7 +2672,8 @@ create_user_new_perms_list() {
 create_user_new_perms_json() {
   echo '{' > "${userNewPermsJSONFile}"
   echo '"permissions":' >> "${userNewPermsJSONFile}"
-  jq --slurp --raw-input 'split("\n")[:-1]' "${userNewPermsListFile}" >> "${userNewPermsJSONFile}"
+  #jq --slurp --raw-input 'split("\n")[:-1]' "${userNewPermsListFile}" >> "${userNewPermsJSONFile}"
+  jq -s -R 'split("\n")[:-1]' "${userNewPermsListFile}" >> "${userNewPermsJSONFile}"
   echo '}' >> "${userNewPermsJSONFile}"
 }
 
