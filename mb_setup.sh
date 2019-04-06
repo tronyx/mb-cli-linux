@@ -2143,7 +2143,8 @@ create_request_results_list() {
 # Function to convert spaces in title to plus sign
 convert_search_string() {
   if [[ "${searchString}" =~ ${spacePattern} ]]; then
-    convertedSearchString=$(echo "${searchString}" |sed 's/ /+/g')
+    #convertedSearchString=$(echo "${searchString}" |sed 's/ /+/g')
+    convertedSearchString=$(echo "${searchString// /+}")
   else
     :
   fi
@@ -2642,7 +2643,8 @@ create_user_new_perms_list() {
     cat "${userPermsListFile}" > "${userNewPermsListFile}"
   elif [ "${permsMenuSelection}" = '2' ]; then
     set +e
-    cat "${userPermsListFile}" |grep -v "${selectedPerm}" > "${userNewPermsListFile}"
+    #cat "${userPermsListFile}" |grep -v "${selectedPerm}" > "${userNewPermsListFile}"
+    grep -v "${selectedPerm}" "${userPermsListFile}" > "${userNewPermsListFile}"
     set -e
   elif [ "${permsMenuSelection}" = '3' ]; then
     true > "${userNewPermsListFile}"
