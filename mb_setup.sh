@@ -41,7 +41,7 @@ radarr3dAPIKeyStatus='invalid'
 # Define temp directory and files
 tempDir='/tmp/mb_setup/'
 spacePattern="( |\')"
-integerPattern='^[0-9]+$'
+integerPattern='^-?[0-9]+$'
 plexCredsFile="${tempDir}plex_creds_check.txt"
 plexServersOwnerFile="${tempDir}plex_server_owners.txt"
 plexServersFriendsFile="${tempDir}plex_server_friends.txt"
@@ -92,7 +92,7 @@ songSearchResults="${tempDir}song_search_results.txt"
 rawUsersFile="${tempDir}users_raw.txt"
 usernamesFile="${tempDir}usernames.txt"
 numberedUsersListFile="${tempDir}numbered_usernames_list.txt"
-rawUserDataFile="${tempDir}user_data_raw.txt"
+rawUserDataFile="${tempDir}raw_user_data.txt"
 rawMBPermsListFile="${tempDir}raw_mb_perms_list.txt"
 mbPermsListFile="${tempDir}mb_perms_list.txt"
 numberedMBPermsListFile="${tempDir}numbered_mb_perms_list.txt"
@@ -100,7 +100,8 @@ userPermsListFile="${tempDir}user_perms_list.txt"
 numberedUserPermsListFile="${tempDir}numbered_user_perms_list.txt"
 userPossiblePermsListFile="${tempDir}user_possible_perms_list.txt"
 numberedUserPossiblePermsListFile="${tempDir}numbered_user_possible_perms_list.txt"
-newUserPermsJSONFile="${tempDir}user_new_perms.json"
+userNewPermsListFile="${tempDir}user_new_perms.txt"
+userNewPermsJSONFile="${tempDir}user_new_perms.json"
 
 # Define text colors
 readonly blu='\e[34m'
@@ -2527,6 +2528,7 @@ configure_request_limits() {
   echo ''
   if ! [[ "${limitCycle}" =~ ${integerPattern} ]] || [[ "${limitAmount}" =~ ${integerPattern} ]]; then
     echo -e "${red}You did not enter a valid number!${endColor}"
+    echo ''
     sleep 3
     clear >&2
     endpoint_menu
@@ -2623,7 +2625,7 @@ create_user_existing_perms_list() {
 # Function to create list of possible perms to add to the selected user
 create_numbered_user_possible_perms_list() {
   set +e
-  diff -u "${mbPermsListFile}" "${userPermsListFile}" |grep -E "^\+" |sed -E 's/^\+//' |grep -Ev "^\+" > "${userPossiblePermsListFile}"
+  diff -u "${userPermsListFile}" "${mbPermsListFile}" |grep -E "^\+" |sed -E 's/^\+//' |grep -Ev "^\+" > "${userPossiblePermsListFile}"
   set -e
   userPossiblePermsList=''
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'userPossiblePermsList=($(cat "${userPossiblePermsListFile}"))'
@@ -2637,19 +2639,22 @@ create_numbered_user_possible_perms_list() {
 create_user_new_perms_list() {
   if [ "${permsMenuSelection}" = '1' ]; then
     echo "${selectedPerm}" >> "${userPermsListFile}"
+    cat "${userPermsListFile}" > "${userNewPermsListFile}"
   elif [ "${permsMenuSelection}" = '2' ]; then
-    cat "${userPermsListFile}" |grep -v "${selectedPerm}" > "${userPermsListFile}"
+    set +e
+    cat "${userPermsListFile}" |grep -v "${selectedPerm}" > "${userNewPermsListFile}"
+    set -e
   elif [ "${permsMenuSelection}" = '3' ]; then
-    true > "${userPermsListFile}"
+    true > "${userNewPermsListFile}"
   fi
 }
 
 # Function to create JSON data list of the user's new MediaButler permissions
 create_user_new_perms_json() {
-  echo '{' > "${newUserPermsJSONFile}"
-  echo '"permissions":' >> "${newUserPermsJSONFile}"
-  jq --slurp --raw-input 'split("\n")[:-1]' "${userPermsListFile}" >> "${newUserPermsJSONFile}"
-  echo '}' >> "${newUserPermsJSONFile}"
+  echo '{' > "${userNewPermsJSONFile}"
+  echo '"permissions":' >> "${userNewPermsJSONFile}"
+  jq --slurp --raw-input 'split("\n")[:-1]' "${userNewPermsListFile}" >> "${userNewPermsJSONFile}"
+  echo '}' >> "${userNewPermsJSONFile}"
 }
 
 # Function to modify user permissions
@@ -2660,58 +2665,78 @@ configure_perms() {
   create_user_existing_perms_list
   create_numbered_user_possible_perms_list
   if [ "${permsMenuSelection}" = '1' ]; then
-    numberOfOptions=$(echo "${#userPossiblePermsList[@]}")
-    cancelOption=$((numberOfOptions+1))
-    echo 'Which permission would you like to add?'
-    echo ''
-    cat "${numberedUserPossiblePermsListFile}"
-    echo -e "${bold}  ${cancelOption})${endColor} Cancel"
-    echo ''
-    read -p "Permission (1-${cancelOption}): " permSelection
-    echo ''
-    if [[ "${permSelection}" -lt '1' ]] || [[ "${permSelection}" -gt "${cancelOption}" ]]; then
-      echo -e "${red}You didn't not specify a valid option!${endColor}"
+    if [[ ! -s "${userPossiblePermsListFile}" ]]; then
+      echo -e "${red}Selected user already has all available permissions!${endColor}"
       echo ''
+      sleep 3
       permissions_menu
-    elif [ "${permSelection}" = "${cancelOption}" ]; then
+    elif [[ -s "${userPossiblePermsListFile}" ]]; then
+      numberOfOptions=$(echo "${#userPossiblePermsList[@]}")
+      cancelOption=$((numberOfOptions+1))
+      echo 'Which permission would you like to add?'
       echo ''
-      permissions_menu
-    else
-      selectedPerm=$(sed "${permSelection}!d" "${userPossiblePermsListFile}")
-      create_user_new_perms_list
-      create_user_new_perms_json
-      curl -L -X PUT "${userMBURL}${endpoint}/${selectedUser}" \
-      -H "${mbClientID}" \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer ${plexServerMBToken}" \
-      --data "@${newUserPermsJSONFile}"
+      cat "${numberedUserPossiblePermsListFile}"
+      echo -e "${bold}  ${cancelOption})${endColor} Cancel"
+      echo ''
+      read -p "Permission (1-${cancelOption}): " permSelection
+      echo ''
+      if [[ "${permSelection}" -lt '1' ]] || [[ "${permSelection}" -gt "${cancelOption}" ]]; then
+        echo -e "${red}You didn't not specify a valid option!${endColor}"
+        echo ''
+        permissions_menu
+      elif [ "${permSelection}" = "${cancelOption}" ]; then
+        echo ''
+        permissions_menu
+      else
+        selectedPerm=$(sed "${permSelection}!d" "${userPossiblePermsListFile}")
+        create_user_new_perms_list
+        create_user_new_perms_json
+        curl -s -L -X PUT "${userMBURL}user/${selectedUser}" \
+        -H "${mbClientID}" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${plexServerMBToken}" \
+        --data "@${userNewPermsJSONFile}" |jq
+        echo ''
+        sleep 3
+        permissions_menu
+      fi
     fi
   elif [ "${permsMenuSelection}" = '2' ]; then
-    numberOfOptions=$(echo "${#userPermsList[@]}")
-    cancelOption=$((numberOfOptions+1))
-    echo 'Which permission would you like to remove?'
-    echo ''
-    cat "${numberedUserPermsListFile}"
-    echo -e "${bold}  ${cancelOption})${endColor} Cancel"
-    echo ''
-    read -p "Permission (1-${cancelOption}): " permSelection
-    echo ''
-    if [[ "${permSelection}" -lt '1' ]] || [[ "${permSelection}" -gt "${cancelOption}" ]]; then
-      echo -e "${red}You didn't not specify a valid option!${endColor}"
+    if [[ ! -s "${userPermsListFile}" ]]; then
+      echo -e "${red}Selected user doesn't have any permissions to remove!${endColor}"
       echo ''
+      sleep 3
       permissions_menu
-    elif [ "${permSelection}" = "${cancelOption}" ]; then
+    elif [[ -s "${userPermsListFile}" ]]; then
+      numberOfOptions=$(echo "${#userPermsList[@]}")
+      cancelOption=$((numberOfOptions+1))
+      echo 'Which permission would you like to remove?'
       echo ''
-      permissions_menu
-    else
-      selectedPerm=$(sed "${permSelection}!d" "${userPossiblePermsListFile}")
-      create_user_new_perms_list
-      create_user_new_perms_json
-      curl -L -X PUT "${userMBURL}${endpoint}/${selectedUser}" \
-      -H "${mbClientID}" \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer ${plexServerMBToken}" \
-      --data "@${newUserPermsJSONFile}"
+      cat "${numberedUserPermsListFile}"
+      echo -e "${bold}  ${cancelOption})${endColor} Cancel"
+      echo ''
+      read -p "Permission (1-${cancelOption}): " permSelection
+      echo ''
+      if [[ "${permSelection}" -lt '1' ]] || [[ "${permSelection}" -gt "${cancelOption}" ]]; then
+        echo -e "${red}You didn't not specify a valid option!${endColor}"
+        echo ''
+        permissions_menu
+      elif [ "${permSelection}" = "${cancelOption}" ]; then
+        echo ''
+        permissions_menu
+      else
+        selectedPerm=$(sed "${permSelection}!d" "${userPermsListFile}")
+        create_user_new_perms_list
+        create_user_new_perms_json
+        curl -s -L -X PUT "${userMBURL}user/${selectedUser}" \
+        -H "${mbClientID}" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${plexServerMBToken}" \
+        --data "@${userNewPermsJSONFile}" |jq
+        echo ''
+        sleep 3
+        permissions_menu
+      fi
     fi
   elif [ "${permsMenuSelection}" = '3' ]; then
     echo -e "${red}**WARNING!!!** This will reset ALL permissions for the selected user!${endColor}"
@@ -2726,11 +2751,14 @@ configure_perms() {
     elif [[ "${userPermsResetConfirmation}" =~ ^(yes|y)$ ]]; then
       create_user_new_perms_list
       create_user_new_perms_json
-      curl -L -X PUT "${userMBURL}${endpoint}/${selectedUser}" \
+      curl -s -L -X PUT "${userMBURL}user/${selectedUser}" \
       -H "${mbClientID}" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer ${plexServerMBToken}" \
-      --data "@${newUserPermsJSONFile}"
+      --data "@${userNewPermsJSONFile}" |jq
+      echo ''
+      sleep 3
+      permissions_menu
     elif [[ "${userPermsResetConfirmation}" =~ ^(no|n)$ ]]; then
       clear >&2
       permissions_menu
