@@ -682,6 +682,22 @@ check_endpoint_configs() {
       endpointConfigured='false'
     elif [[ ${endpointConfigCheckResponse} != '{}' ]]; then
       endpointConfigured='true'
+      if [[ ${endpoint} == 'sonarr' ]]; then
+        sed -i.bak "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
+        sonarrURLStatus='ok'
+        sed -i.bak "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
+        sonarrAPIKeyStatus='ok'
+      elif [[ ${endpoint} == 'sonarr4k' ]]; then
+        reset_sonarr4k
+      elif [[ ${endpoint} == 'radarr' ]]; then
+        reset_radarr
+      elif [[ ${endpoint} == 'radarr4k' ]]; then
+        reset_radarr4k
+      elif [[ ${endpoint} == 'radarr3d' ]]; then
+        reset_radarr3d
+      elif [[ ${endpoint} == 'tautulli' ]]; then
+        reset_tautulli
+      fi
     fi
   done < <(cat "${endpointsListFile}")
 }
