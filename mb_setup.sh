@@ -51,6 +51,7 @@ plexTokenFile="${tempDir}plex_token.txt"
 plexServersFile="${tempDir}plex_server_list.txt"
 numberedPlexServersFile="${tempDir}numbered_plex_server_list.txt"
 adminCheckFile="${tempDir}admin_check.txt"
+endpointsListFile="${tempDir}endpoints_list.txt"
 rawArrProfilesFile="${tempDir}raw_arr_profiles.txt"
 arrProfilesFile="${tempDir}arr_profiles.txt"
 numberedArrProfilesFile="${tempDir}numbered_arr_profiles.txt"
@@ -662,6 +663,27 @@ check_admin() {
     fi
   fi
   set -e
+}
+
+# Function to check which endpoints are already configured and, if they are, mark them as such
+check_endpoint_configs() {
+  curl -s --connect-timeout 10 -m 15 -L -X GET "${userMBURL}version/" \
+    -H 'Content-Type: application/x-www-form-urlencoded' \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}" | jq .endpoints[] | tr -d '"' | grep -E 'arr|taut' > "${endpointsListFile}"
+  availableEndpoints=''
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'availableEndpoints=($(cat "${endpointsListFile}"))'
+  for ((endpoint = 0; endpoint < ${#availableEndpoints[@]}; ++endpoint)); do
+    endpointConfigCheckResponse=$(curl -s --connect-timeout 10 -m 15 -X GET "${userMBURL}configure/${endpoint}" \
+      -H 'Content-Type: application/x-www-form-urlencoded'  \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" |jq .settings)
+    if [[ ${endpointConfigCheckResponse} == '{}' ]]; then
+      endpointConfigured='false'
+    elif [[ ${endpointConfigCheckResponse} != '{}' ]]; then
+      endpointConfigured='true'
+    fi
+  done < <(cat "${endpointsListFile}")
 }
 
 # Function to create environment variables file for persistence
