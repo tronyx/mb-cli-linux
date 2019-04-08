@@ -2165,73 +2165,78 @@ now_playing() {
 
 # Function to gather NowPlaying stats from Tautulli and display it
 playback_history() {
-  endpoint='tautulli'
-  curl -s -L -X GET "${userMBURL}${endpoint}/history" \
-    -H "${mbClientID}" \
-    -H "Authorization: Bearer ${plexServerMBToken}" | jq . > "${historyRawFile}"
-  numberOfHistoryItems=$(jq .response.data.data[].title "${historyRawFile}" | wc -l)
-  echo -e "${lblu}============================================================${endColor}" > "${historyDataFile}"
-  if [[ ${numberOfHistoryItems} -gt '0' ]]; then
-    totalDuration=$(jq .response.data.total_duration "${historyRawFile}" | tr -d '"')
-    shownDuration=$(jq .response.data.filter_duration "${historyRawFile}" | tr -d '"')
-    echo -e "${bold}Total Duration - Shown Duration${endColor}" > "${durationDataFile}"
-    echo -e "${grn}${totalDuration} - ${shownDuration}${endColor}" >> "${durationDataFile}"
-    column -ts- "${durationDataFile}" >> "${historyDataFile}"
-    for item in $(seq 0 $((numberOfHistoryItems - 1))); do
-      mediaType=$(jq .response.data.data["${item}"].media_type "${historyRawFile}" | tr -d '"')
-      if [[ ${mediaType} == 'movie' ]]; then
-        platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" | tr -d '"')
-        device=$(jq .response.data.data["${item}"].player "${historyRawFile}" | tr -d '"')
-        title=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" | tr -d '"')
-        titleYear=$(jq .response.data.data["${item}"].year "${historyRawFile}" | tr -d '"')
-        playing=$(echo "${title} (${titleYear})")
-        transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" | tr -d '"')
-        playbackType=$(echo "${transcodeDecision}" | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
-        startTime=$(jq .response.data.data["${item}"].started "${historyRawFile}" | tr -d '"')
-        stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" | tr -d '"')
-        duration=$((stoppedTime - startTime))
-        friendlyDuration=$(echo "[$((duration / 60))m $((duration % 60))s]")
-        echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
-        echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
-      elif [[ ${mediaType} == 'episode' ]]; then
-        platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" | tr -d '"')
-        device=$(jq .response.data.data["${item}"].player "${historyRawFile}" | tr -d '"')
-        parentTitle=$(jq .response.data.data["${item}"].parent_media_index "${historyRawFile}")
-        seasonNum=$(printf "%02d" ${parentTitle})
-        mediaIndex=$(jq .response.data.data["${item}"].media_index "${historyRawFile}")
-        episodeNum=$(printf "%02d" ${mediaIndex})
-        title=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" | tr -d '"')
-        playing=$(echo "${title} - S${seasonNum}E${episodeNum}")
-        transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" | tr -d '"')
-        playbackType=$(echo "${transcodeDecision}" | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
-        startTime=$(jq .response.data.data["${item}"].started "${historyRawFile}" | tr -d '"')
-        stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" | tr -d '"')
-        duration=$((stoppedTime - startTime))
-        friendlyDuration=$(echo "[$((duration / 60))m $((duration % 60))s]")
-        echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
-        echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
-      elif [[ ${mediaType} == 'track' ]]; then
-        platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" | tr -d '"')
-        device=$(jq .response.data.data["${item}"].player "${historyRawFile}" | tr -d '"')
-        playing=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" | tr -d '"')
-        transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" | tr -d '"')
-        playbackType=$(echo "${transcodeDecision}" | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
-        startTime=$(jq .response.data.data["${item}"].started "${historyRawFile}" | tr -d '"')
-        stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" | tr -d '"')
-        duration=$((stoppedTime - startTime))
-        friendlyDuration=$(echo "[$((duration / 60))m $((duration % 60))s]")
-        echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
-        echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
-      fi
-    done
-    echo -e "${lblu}============================================================${endColor}" >> "${historyDataFile}"
-    cat "${historyDataFile}"
-    echo ''
-    playback_menu
-  elif [[ ${numberOfHistoryItems} -le '0' ]]; then
-    echo -e "${org}There is no playback history at this time.${endColor}"
-    echo ''
-    playback_menu
+  if [[ ${tautulliEndpointConfigured} == 'false' ]]; then
+    echo -e "${red}Your Tautulli endpoint has not been configured yet!${endColor}"
+    exit 0
+  elif [[ ${tautulliEndpointConfigured} == 'true' ]]; then
+    endpoint='tautulli'
+    curl -s -L -X GET "${userMBURL}${endpoint}/history" \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" | jq . > "${historyRawFile}"
+    numberOfHistoryItems=$(jq .response.data.data[].title "${historyRawFile}" | wc -l)
+    echo -e "${lblu}============================================================${endColor}" > "${historyDataFile}"
+    if [[ ${numberOfHistoryItems} -gt '0' ]]; then
+      totalDuration=$(jq .response.data.total_duration "${historyRawFile}" | tr -d '"')
+      shownDuration=$(jq .response.data.filter_duration "${historyRawFile}" | tr -d '"')
+      echo -e "${bold}Total Duration - Shown Duration${endColor}" > "${durationDataFile}"
+      echo -e "${grn}${totalDuration} - ${shownDuration}${endColor}" >> "${durationDataFile}"
+      column -ts- "${durationDataFile}" >> "${historyDataFile}"
+      for item in $(seq 0 $((numberOfHistoryItems - 1))); do
+        mediaType=$(jq .response.data.data["${item}"].media_type "${historyRawFile}" | tr -d '"')
+        if [[ ${mediaType} == 'movie' ]]; then
+          platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" | tr -d '"')
+          device=$(jq .response.data.data["${item}"].player "${historyRawFile}" | tr -d '"')
+          title=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" | tr -d '"')
+          titleYear=$(jq .response.data.data["${item}"].year "${historyRawFile}" | tr -d '"')
+          playing=$(echo "${title} (${titleYear})")
+          transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" | tr -d '"')
+          playbackType=$(echo "${transcodeDecision}" | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
+          startTime=$(jq .response.data.data["${item}"].started "${historyRawFile}" | tr -d '"')
+          stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" | tr -d '"')
+          duration=$((stoppedTime - startTime))
+          friendlyDuration=$(echo "[$((duration / 60))m $((duration % 60))s]")
+          echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
+          echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
+        elif [[ ${mediaType} == 'episode' ]]; then
+          platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" | tr -d '"')
+          device=$(jq .response.data.data["${item}"].player "${historyRawFile}" | tr -d '"')
+          parentTitle=$(jq .response.data.data["${item}"].parent_media_index "${historyRawFile}")
+          seasonNum=$(printf "%02d" ${parentTitle})
+          mediaIndex=$(jq .response.data.data["${item}"].media_index "${historyRawFile}")
+          episodeNum=$(printf "%02d" ${mediaIndex})
+          title=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" | tr -d '"')
+          playing=$(echo "${title} - S${seasonNum}E${episodeNum}")
+          transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" | tr -d '"')
+          playbackType=$(echo "${transcodeDecision}" | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
+          startTime=$(jq .response.data.data["${item}"].started "${historyRawFile}" | tr -d '"')
+          stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" | tr -d '"')
+          duration=$((stoppedTime - startTime))
+          friendlyDuration=$(echo "[$((duration / 60))m $((duration % 60))s]")
+          echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
+          echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
+        elif [[ ${mediaType} == 'track' ]]; then
+          platform=$(jq .response.data.data["${item}"].platform "${historyRawFile}" | tr -d '"')
+          device=$(jq .response.data.data["${item}"].player "${historyRawFile}" | tr -d '"')
+          playing=$(jq .response.data.data["${item}"].full_title "${historyRawFile}" | tr -d '"')
+          transcodeDecision=$(jq .response.data.data["${item}"].transcode_decision "${historyRawFile}" | tr -d '"')
+          playbackType=$(echo "${transcodeDecision}" | awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1')
+          startTime=$(jq .response.data.data["${item}"].started "${historyRawFile}" | tr -d '"')
+          stoppedTime=$(jq .response.data.data["${item}"].stopped "${historyRawFile}" | tr -d '"')
+          duration=$((stoppedTime - startTime))
+          friendlyDuration=$(echo "[$((duration / 60))m $((duration % 60))s]")
+          echo -e "${bold}${playing}${endColor}" >> "${historyDataFile}"
+          echo -e "${playbackType} - ${platform} - ${device} ${friendlyDuration}" >> "${historyDataFile}"
+        fi
+      done
+      echo -e "${lblu}============================================================${endColor}" >> "${historyDataFile}"
+      cat "${historyDataFile}"
+      echo ''
+      playback_menu
+    elif [[ ${numberOfHistoryItems} -le '0' ]]; then
+      echo -e "${org}There is no playback history at this time.${endColor}"
+      echo ''
+      playback_menu
+    fi
   fi
 }
 
