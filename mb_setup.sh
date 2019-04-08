@@ -628,19 +628,25 @@ prompt_for_plex_server() {
 
 # Function to determine whether user has admin permissions to the selected Plex Server
 check_admin() {
+  set +e
   adminCheckHTTPResponse=$(curl -s --connect-timeout 10 -m 15 -o "${adminCheckFile}" -w "%{http_code}" -L -X GET "${userMBURL}user/@me/" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     -H "${mbClientID}" \
     -H "Authorization: Bearer ${plexServerMBToken}")
-  if [[ ${adminCheckHTTPResponse} == '200' ]]; then
+  if [[ ${adminCheckHTTPResponse} != '200' ]]; then
+    echo -e "${red}There was an issue checking your permissions for the selected Plex Server!${endColor}"
+    echo -e "${ylw}Please make sure your MediaButler API is functioning properly and try again.${endColor}"
+    sleep 3
+    reset_plex
+    clear >&2
+    exit 0
+  elif [[ ${adminCheckHTTPResponse} == '200' ]]; then
     adminCheckContentResponse=$(curl -s --connect-timeout 10 -m 15 -o "${adminCheckFile}" -w "%{content_type}" -L -X GET "${userMBURL}user/@me/" \
       -H 'Content-Type: application/x-www-form-urlencoded' \
       -H "${mbClientID}" \
       -H "Authorization: Bearer ${plexServerMBToken}")
     if [[ ${adminCheckContentResponse} =~ 'json' ]]; then
-      set +e
       adminCheckResponse=$(grep -i admin "${adminCheckFile}" | awk '{print $1}' | tr -d '"')
-      set -e
       if [[ ${adminCheckResponse} =~ 'ADMIN' ]]; then
         isAdmin='true'
       elif [[ ${adminCheckResponse} != *'ADMIN'* ]] || [[ ${adminCheckResponse} == '' ]]; then
@@ -654,14 +660,8 @@ check_admin() {
       clear >&2
       exit 0
     fi
-  elif [[ ${adminCheckHTTPResponse} != '200' ]]; then
-    echo -e "${red}There was an issue checking your permissions for the selected Plex Server!${endColor}"
-    echo -e "${ylw}Please make sure your MediaButler API is functioning properly and try again.${endColor}"
-    sleep 3
-    reset_plex
-    clear >&2
-    exit 0
   fi
+  set -e
 }
 
 # Function to create environment variables file for persistence
