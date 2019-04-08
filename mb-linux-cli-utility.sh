@@ -673,7 +673,7 @@ check_endpoint_configs() {
     -H "Authorization: Bearer ${plexServerMBToken}" | jq .endpoints[] | tr -d '"' | grep -E 'arr|taut' > "${endpointsListFile}"
   availableEndpoints=''
   IFS=$'\r\n' GLOBIGNORE='*' command eval 'availableEndpoints=($(cat "${endpointsListFile}"))'
-  for endpoint in ${availableEndpoints[@]}; do
+  for endpoint in "${availableEndpoints[@]}"; do
     endpointConfigCheckResponse=$(curl -s --connect-timeout 10 -m 15 -X GET "${userMBURL}configure/${endpoint}" \
       -H 'Content-Type: application/x-www-form-urlencoded'  \
       -H "${mbClientID}" \
