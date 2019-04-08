@@ -51,6 +51,7 @@ plexTokenFile="${tempDir}plex_token.txt"
 plexServersFile="${tempDir}plex_server_list.txt"
 numberedPlexServersFile="${tempDir}numbered_plex_server_list.txt"
 adminCheckFile="${tempDir}admin_check.txt"
+endpointsListFile="${tempDir}endpoints_list.txt"
 rawArrProfilesFile="${tempDir}raw_arr_profiles.txt"
 arrProfilesFile="${tempDir}arr_profiles.txt"
 numberedArrProfilesFile="${tempDir}numbered_arr_profiles.txt"
@@ -662,6 +663,43 @@ check_admin() {
     fi
   fi
   set -e
+}
+
+# Function to check which endpoints are already configured and, if they are, mark them as such
+check_endpoint_configs() {
+  curl -s --connect-timeout 10 -m 15 -L -X GET "${userMBURL}version/" \
+    -H 'Content-Type: application/x-www-form-urlencoded' \
+    -H "${mbClientID}" \
+    -H "Authorization: Bearer ${plexServerMBToken}" | jq .endpoints[] | tr -d '"' | grep -E 'arr|taut' > "${endpointsListFile}"
+  availableEndpoints=''
+  IFS=$'\r\n' GLOBIGNORE='*' command eval 'availableEndpoints=($(cat "${endpointsListFile}"))'
+  for ((endpoint = 0; endpoint < ${#availableEndpoints[@]}; ++endpoint)); do
+    endpointConfigCheckResponse=$(curl -s --connect-timeout 10 -m 15 -X GET "${userMBURL}configure/${endpoint}" \
+      -H 'Content-Type: application/x-www-form-urlencoded'  \
+      -H "${mbClientID}" \
+      -H "Authorization: Bearer ${plexServerMBToken}" |jq .settings)
+    if [[ ${endpointConfigCheckResponse} == '{}' ]]; then
+      endpointConfigured='false'
+    elif [[ ${endpointConfigCheckResponse} != '{}' ]]; then
+      endpointConfigured='true'
+      if [[ ${endpoint} == 'sonarr' ]]; then
+        sed -i.bak "${sonarrURLStatusLineNum} s/sonarrURLStatus='[^']*'/sonarrURLStatus='ok'/" "${scriptname}"
+        sonarrURLStatus='ok'
+        sed -i.bak "${sonarrAPIKeyStatusLineNum} s/sonarrAPIKeyStatus='[^']*'/sonarrAPIKeyStatus='ok'/" "${scriptname}"
+        sonarrAPIKeyStatus='ok'
+      elif [[ ${endpoint} == 'sonarr4k' ]]; then
+        reset_sonarr4k
+      elif [[ ${endpoint} == 'radarr' ]]; then
+        reset_radarr
+      elif [[ ${endpoint} == 'radarr4k' ]]; then
+        reset_radarr4k
+      elif [[ ${endpoint} == 'radarr3d' ]]; then
+        reset_radarr3d
+      elif [[ ${endpoint} == 'tautulli' ]]; then
+        reset_tautulli
+      fi
+    fi
+  done < <(cat "${endpointsListFile}")
 }
 
 # Function to create environment variables file for persistence
