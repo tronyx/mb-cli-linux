@@ -1364,8 +1364,11 @@ setup_sonarr() {
     elif [[ ${sonarrURLStatus} == 'invalid' ]] || [[ ${sonarrAPIKeyStatus} == 'invalid' ]]; then
       :
     fi
-    #echo 'Checking that the provided Sonarr URL is valid...'
+    echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
+    read -r providedURL
     convert_url
+    echo ''
+    #echo 'Checking that the provided Sonarr URL is valid...'
     #set +e
     #sonarrURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}")
     #sonarrURLAppCheckResponse=$(curl -s --connect-timeout 10 "${convertedURL}" | grep '<title>' | awk '{print $1}' | cut -c8-13)
@@ -1390,20 +1393,17 @@ setup_sonarr() {
     #    set -e
     #  fi
     #done
-    echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
-    read -r providedURL
-    echo ''
     echo 'Please enter your Sonarr API key:'
     read -rs sonarrAPIKey
     echo ''
     echo 'Testing that the provided Sonarr URL and API Key are valid...'
     set +e
     sonarrURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}")
-    sonarrAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" | grep -i startup | grep -ci radarr)
-    sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" | tr -d '"' | head -1)
+    sonarrAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" | grep -i startup | grep -ci sonarr)
+    sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" | grep -c version)
     set -e
     while [[ ${sonarrAPIKeyStatus} == 'invalid' ]] || [[ ${sonarrURLStatus} == 'invalid' ]]; do
-      if [[ ${sonarrURLCheckResponse} != '200' ]] || [[ ${sonarrAppCheckResponse} -lt 1 ]] || [[ ${sonarrAPITestResponse} == 'Unauthorized' ]]; then
+      if [[ ${sonarrURLCheckResponse} != '200' ]] || [[ ${sonarrAppCheckResponse} -lt 1 ]] || [[ ${sonarrAPITestResponse} -lt 1 ]]; then
         echo -e "${red}There was an error while attempting to validate the provided information!${endColor}"
         echo ''
         echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
@@ -1416,10 +1416,10 @@ setup_sonarr() {
         echo 'Testing that the provided Sonarr URL and API Key are valid...'
         set +e
         sonarrURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}")
-        sonarrAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" | jq .startupPath | grep -ci radarr)
-        sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" | jq .[] | tr -d '"' | head -1)
+        sonarrAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" | grep -i startup | grep -ci sonarr)
+        sonarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarrAPIKey}" | grep -c version)
         set -e
-      elif [[ ${sonarrURLCheckResponse} == '200' ]] && [[ ${sonarrAppCheckResponse} -ge 1 ]] && [[ ${sonarrAPITestResponse} != 'Unauthorized' ]]; then
+      elif [[ ${sonarrURLCheckResponse} == '200' ]] && [[ ${sonarrAppCheckResponse} -ge 1 ]] && [[ ${sonarrAPITestResponse} -ge 1 ]]; then
         sed -i.bak "${sonarrURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         sonarrURLStatus='ok'
         sed -i.bak "${sonarrAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='ok'/" "${scriptname}"
@@ -1539,10 +1539,10 @@ setup_sonarr() {
     set +e
     sonarr4kURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}")
     sonarr4kAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" | grep -i startup | grep -ci radarr)
-    sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" | tr -d '"' | head -1)
+    sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" | grep -c version)
     set -e
     while [[ ${sonarr4kAPIKeyStatus} == 'invalid' ]] || [[ ${sonarr4kURLStatus} == 'invalid' ]]; do
-      if [[ ${sonarr4kURLCheckResponse} != '200' ]] || [[ ${sonarr4kAppCheckResponse} -lt 1 ]] || [[ ${sonarr4kAPITestResponse} == 'Unauthorized' ]]; then
+      if [[ ${sonarr4kURLCheckResponse} != '200' ]] || [[ ${sonarr4kAppCheckResponse} -lt 1 ]] || [[ ${sonarr4kAPITestResponse} -lt 1 ]]; then
         echo -e "${red}There was an error while attempting to validate the provided information!${endColor}"
         echo ''
         echo 'Please enter your Sonarr 4K URL (IE: http://127.0.0.1:8989/sonarr/):'
@@ -1556,9 +1556,9 @@ setup_sonarr() {
         set +e
         sonarr4kURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}")
         sonarr4kAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" | jq .startupPath | grep -ci radarr)
-        sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" | jq .[] | tr -d '"' | head -1)
+        sonarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${sonarr4kAPIKey}" | grep -c version)
         set -e
-      elif [[ ${sonarr4kURLCheckResponse} == '200' ]] && [[ ${sonarr4kAppCheckResponse} -ge 1 ]] && [[ ${sonarr4kAPITestResponse} != 'Unauthorized' ]]; then
+      elif [[ ${sonarr4kURLCheckResponse} == '200' ]] && [[ ${sonarr4kAppCheckResponse} -ge 1 ]] && [[ ${sonarr4kAPITestResponse} -ge 1 ]]; then
         sed -i.bak "${sonarr4kURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         sonarr4kURLStatus='ok'
         sed -i.bak "${sonarr4kAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='ok'/" "${scriptname}"
@@ -1683,10 +1683,10 @@ setup_radarr() {
     set +e
     radarrURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}")
     radarrAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" | grep -i startup | grep -ci radarr)
-    radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" | tr -d '"' | head -1)
+    radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" | grep -c version)
     set -e
     while [[ ${radarrAPIKeyStatus} == 'invalid' ]] || [[ ${radarrURLStatus} == 'invalid' ]]; do
-      if [[ ${radarrURLCheckResponse} != '200' ]] || [[ ${radarrAppCheckResponse} -lt 1 ]] || [[ ${radarrAPITestResponse} == 'Unauthorized' ]]; then
+      if [[ ${radarrURLCheckResponse} != '200' ]] || [[ ${radarrAppCheckResponse} -lt 1 ]] || [[ ${radarrAPITestResponse} -lt 1 ]]; then
         echo -e "${red}There was an error while attempting to validate the provided information!${endColor}"
         echo ''
         echo 'Please enter your Radarr URL (IE: http://127.0.0.1:7878/radarr/):'
@@ -1699,10 +1699,10 @@ setup_radarr() {
         echo 'Testing that the provided Radarr URL and API Key are valid...'
         set +e
         radarrURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}")
-        radarrAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" | jq .startupPath | grep -ci radarr)
-        radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" | jq .[] | tr -d '"' | head -1)
+        radarrAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" | grep -i startup | grep -ci radarr)
+        radarrAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarrAPIKey}" | grep -c version)
         set -e
-      elif [[ ${radarrURLCheckResponse} == '200' ]] && [[ ${radarrAppCheckResponse} -ge 1 ]] && [[ ${radarrAPITestResponse} != 'Unauthorized' ]]; then
+      elif [[ ${radarrURLCheckResponse} == '200' ]] && [[ ${radarrAppCheckResponse} -ge 1 ]] && [[ ${radarrAPITestResponse} -ge 1 ]]; then
         sed -i.bak "${radarrURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         radarrURLStatus='ok'
         sed -i.bak "${radarrAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='ok'/" "${scriptname}"
@@ -1822,10 +1822,10 @@ setup_radarr() {
     set +e
     radarr4kURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}")
     radarr4kAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" | grep -i startup | grep -ci radarr)
-    radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" | tr -d '"' | head -1)
+    radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" | grep -c version)
     set -e
     while [[ ${radarr4kAPIKeyStatus} == 'invalid' ]] || [[ ${radarr4kURLStatus} == 'invalid' ]]; do
-      if [[ ${radarr4kURLCheckResponse} != '200' ]] || [[ ${radarr4kAppCheckResponse} -lt 1 ]] || [[ ${radarr4kAPITestResponse} == 'Unauthorized' ]]; then
+      if [[ ${radarr4kURLCheckResponse} != '200' ]] || [[ ${radarr4kAppCheckResponse} -lt 1 ]] || [[ ${radarr4kAPITestResponse} -lt 1 ]]; then
         echo -e "${red}There was an error while attempting to validate the provided information!${endColor}"
         echo ''
         echo 'Please enter your Radarr 4K URL (IE: http://127.0.0.1:7878/radarr/):'
@@ -1838,10 +1838,10 @@ setup_radarr() {
         echo 'Testing that the provided Radarr 4K URL and API Key are valid...'
         set +e
         radarr4kURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}")
-        radarr4kAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" | jq .startupPath | grep -ci radarr)
-        radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" | jq .[] | tr -d '"' | head -1)
+        radarr4kAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" | grep -i startup | grep -ci radarr)
+        radarr4kAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr4kAPIKey}" | grep -c version)
         set -e
-      elif [[ ${radarr4kURLCheckResponse} == '200' ]] && [[ ${radarr4kAppCheckResponse} -ge 1 ]] && [[ ${radarr4kAPITestResponse} != 'Unauthorized' ]]; then
+      elif [[ ${radarr4kURLCheckResponse} == '200' ]] && [[ ${radarr4kAppCheckResponse} -ge 1 ]] && [[ ${radarr4kAPITestResponse} -ge  1 ]]; then
         sed -i.bak "${radarr4kURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         radarr4kURLStatus='ok'
         sed -i.bak "${radarr4kAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='ok'/" "${scriptname}"
@@ -1958,10 +1958,10 @@ setup_radarr() {
     set +e
     radarr3dURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}")
     radarr3dAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" | grep -i startup | grep -ci radarr)
-    radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" | tr -d '"' | head -1)
+    radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" | grep -c version)
     set -e
     while [[ ${radarr3dAPIKeyStatus} == 'invalid' ]] || [[ ${radarr3dURLStatus} == 'invalid' ]]; do
-      if [[ ${radarr3dURLCheckResponse} != '200' ]] || [[ ${radarr3dAppCheckResponse} -lt 1 ]] || [[ ${radarr3dAPITestResponse} == 'Unauthorized' ]]; then
+      if [[ ${radarr3dURLCheckResponse} != '200' ]] || [[ ${radarr3dAppCheckResponse} -lt 1 ]] || [[ ${radarr3dAPITestResponse} -lt 1 ]]; then
         echo -e "${red}There was an error while attempting to validate the provided information!${endColor}"
         echo ''
         echo 'Please enter your Radarr 3D URL (IE: http://127.0.0.1:7878/radarr/):'
@@ -1974,10 +1974,10 @@ setup_radarr() {
         echo 'Testing that the provided Radarr 3D URL and API Key are valid...'
         set +e
         radarr3dURLCheckResponse=$(curl -I -w "%{http_code}" -sI -o /dev/null --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}")
-        radarr3dAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" | jq .startupPath | grep -ci radarr)
-        radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" | jq .[] | tr -d '"' | head -1)
+        radarr3dAppCheckResponse=$(curl -sL --connect-timeout 10 "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" | grep -i startup | grep -ci radarr)
+        radarr3dAPITestResponse=$(curl -s -X GET "${convertedURL}api/system/status" -H "X-Api-Key: ${radarr3dAPIKey}" | grep -c version)
         set -e
-      elif [[ ${radarr3dURLCheckResponse} == '200' ]] && [[ ${radarr3dAppCheckResponse} -ge 1 ]] && [[ ${radarr3dAPITestResponse} != 'Unauthorized' ]]; then
+      elif [[ ${radarr3dURLCheckResponse} == '200' ]] && [[ ${radarr3dAppCheckResponse} -ge 1 ]] && [[ ${radarr3dAPITestResponse} -ge 1 ]]; then
         sed -i.bak "${radarr3dURLStatusLineNum} s/${endpoint}URLStatus='[^']*'/${endpoint}URLStatus='ok'/" "${scriptname}"
         radarr3dURLStatus='ok'
         sed -i.bak "${radarr3dAPIKeyStatusLineNum} s/${endpoint}APIKeyStatus='[^']*'/${endpoint}APIKeyStatus='ok'/" "${scriptname}"
