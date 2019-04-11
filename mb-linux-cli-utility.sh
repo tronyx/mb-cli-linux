@@ -758,8 +758,8 @@ create_env_file() {
   jq '. | split("\n") | map( split("\t") | {name: .[0], value: .[1]} ) | {data: .} ' -R -s "${envFile}" > "${jsonEnvFile}"
 }
 
-# Function to exit the menu
-exit_menu() {
+# Function to prompt for confirmation when you exit a menu
+exit_prompt() {
   echo -e "${red}This will exit the program and any unfinished config setup will be lost!${endColor}"
   echo -e "${ylw}Are you sure you wish to exit?${endColor}"
   echo ''
@@ -769,7 +769,7 @@ exit_menu() {
   if ! [[ ${exitPrompt} =~ ^(yes|y|no|n)$ ]]; then
     echo -e "${red}Please specify yes, y, no, or n.${endColor}"
     echo ''
-    exit_menu
+    exit_prompt
   elif [[ ${exitPrompt} =~ ^(yes|y)$ ]]; then
     clear >&2
     exit 0
@@ -847,7 +847,7 @@ main_menu() {
   elif [[ ${mainMenuSelection} == '8' ]]; then
     reset
   elif [[ ${mainMenuSelection} == '9' ]]; then
-    exit_menu
+    exit_prompt
   fi
 }
 
