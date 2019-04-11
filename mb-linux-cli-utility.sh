@@ -1390,6 +1390,9 @@ setup_sonarr() {
     #    set -e
     #  fi
     #done
+    echo 'Please enter your Sonarr URL (IE: http://127.0.0.1:8989/sonarr/):'
+    read -r providedURL
+    echo ''
     echo 'Please enter your Sonarr API key:'
     read -rs sonarrAPIKey
     echo ''
@@ -1500,6 +1503,9 @@ setup_sonarr() {
     elif [[ ${sonarr4kURLStatus} == 'invalid' ]] || [[ ${sonarr4kAPIKeyStatus} == 'invalid' ]]; then
       :
     fi
+    echo 'Please enter your Sonarr 4K URL (IE: http://127.0.0.1:8989/sonarr/):'
+    read -r providedURL
+    echo ''
     #echo 'Checking that the provided Sonarr 4K URL is valid...'
     convert_url
     #set +e
