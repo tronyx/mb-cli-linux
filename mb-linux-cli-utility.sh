@@ -841,7 +841,11 @@ main_menu() {
   elif [[ ${mainMenuSelection} == '5' ]]; then
     playback_menu
   elif [[ ${mainMenuSelection} == '6' ]]; then
-    library_menu
+    #library_menu
+    echo -e "${red}This menu is not live yet!${endColor}"
+    sleep 3
+    clear >&2
+    main_menu
   elif [[ ${mainMenuSelection} == '7' ]]; then
     search_menu
   elif [[ ${mainMenuSelection} == '8' ]]; then
